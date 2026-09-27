@@ -36,8 +36,23 @@ public final class DisplayController: @unchecked Sendable {
     /// settable. Volume keys use this to target whichever display is actually playing.
     public let audioDeviceID: AudioDeviceID?
 
-    /// Called after state changes, on an arbitrary queue. The UI hops to main itself.
-    public var onStateChange: (@Sendable () -> Void)?
+    /// Observers notified after state changes, on an arbitrary queue. Callers hop to
+    /// their own queue. Several parties observe at once — the UI and the preference
+    /// store — so this is a list rather than a single handler.
+    private var stateObservers: [@Sendable () -> Void] = []
+
+    public func addStateObserver(_ observer: @escaping @Sendable () -> Void) {
+        stateLock.lock()
+        stateObservers.append(observer)
+        stateLock.unlock()
+    }
+
+    private func notifyStateChanged() {
+        stateLock.lock()
+        let observers = stateObservers
+        stateLock.unlock()
+        for observer in observers { observer() }
+    }
 
     private let api: PrivateDisplayAPI
     private let stateLock = NSLock()
@@ -45,6 +60,14 @@ public final class DisplayController: @unchecked Sendable {
     private var _brightness: Float = 0
     private var _volume: Float = 0
     private var _isMuted = false
+
+    /// Whether a real value was ever obtained from the hardware.
+    ///
+    /// Callers persist what they read, so an unread level must be distinguishable from
+    /// a genuine zero. Without this a failed brightness read looks like 0, gets saved,
+    /// and is restored onto the panel later — blacking out the display.
+    private var _hasBrightnessReading = false
+    private var _hasVolumeReading = false
 
     /// DDC reports its own scale; do not assume 100.
     private var brightnessMax: UInt16 = 100
@@ -105,6 +128,10 @@ public final class DisplayController: @unchecked Sendable {
     public var canSetBrightness: Bool { brightnessBackend != .unavailable }
     public var canSetVolume: Bool { volumeBackend != .unavailable }
 
+    /// True once brightness reflects the hardware, whether read or written.
+    public var hasBrightnessReading: Bool { stateLock.withLock { _hasBrightnessReading } }
+    public var hasVolumeReading: Bool { stateLock.withLock { _hasVolumeReading } }
+
     // MARK: - Reading (once, on connect)
 
     /// Reads real values from the hardware. Blocking and slow (~110ms per DDC read),
@@ -113,13 +140,17 @@ public final class DisplayController: @unchecked Sendable {
         switch brightnessBackend {
         case .native:
             if let value = api.nativeBrightness(info.id) {
-                setLocal { self._brightness = value }
+                setLocal {
+                    self._brightness = value
+                    self._hasBrightnessReading = true
+                }
             }
         case .ddc:
-            if let reading = try? info.ddc?.get(.brightness), reading.maximum > 0 {
+            if let reading = try? info.ddc?.get(.brightness, attempts: 3), reading.maximum > 0 {
                 setLocal {
                     self.brightnessMax = reading.maximum
                     self._brightness = Float(reading.current) / Float(reading.maximum)
+                    self._hasBrightnessReading = true
                 }
             }
         case .unavailable:
@@ -129,27 +160,31 @@ public final class DisplayController: @unchecked Sendable {
         switch volumeBackend {
         case .coreAudio(let device):
             if let value = AudioControl.volume(device) {
-                setLocal { self._volume = value }
+                setLocal {
+                    self._volume = value
+                    self._hasVolumeReading = true
+                }
             }
             if let muted = AudioControl.isMuted(device) {
                 setLocal { self._isMuted = muted }
             }
         case .ddc:
-            if let reading = try? info.ddc?.get(.audioVolume), reading.maximum > 0 {
+            if let reading = try? info.ddc?.get(.audioVolume, attempts: 3), reading.maximum > 0 {
                 setLocal {
                     self.volumeMax = reading.maximum
                     self._volume = Float(reading.current) / Float(reading.maximum)
+                    self._hasVolumeReading = true
                 }
             }
             // VCP 0x8D: 1 means muted, 2 means unmuted.
-            if let reading = try? info.ddc?.get(.audioMute) {
+            if let reading = try? info.ddc?.get(.audioMute, attempts: 2) {
                 setLocal { self._isMuted = reading.current == 1 }
             }
         case .unavailable:
             break
         }
 
-        onStateChange?()
+        notifyStateChanged()
     }
 
     // MARK: - Writing (optimistic, coalesced)
@@ -158,8 +193,11 @@ public final class DisplayController: @unchecked Sendable {
     public func setBrightness(_ value: Float) {
         guard canSetBrightness else { return }
         let clamped = max(0, min(1, value))
-        setLocal { self._brightness = clamped }
-        onStateChange?()
+        setLocal {
+            self._brightness = clamped
+            self._hasBrightnessReading = true
+        }
+        notifyStateChanged()
         brightnessWriter.submit(clamped)
     }
 
@@ -168,17 +206,18 @@ public final class DisplayController: @unchecked Sendable {
         let clamped = max(0, min(1, value))
         setLocal {
             self._volume = clamped
+            self._hasVolumeReading = true
             // Any deliberate volume change implies unmuting, matching macOS.
             if clamped > 0 { self._isMuted = false }
         }
-        onStateChange?()
+        notifyStateChanged()
         volumeWriter.submit(clamped)
     }
 
     public func setMuted(_ muted: Bool) {
         guard canSetVolume else { return }
         setLocal { self._isMuted = muted }
-        onStateChange?()
+        notifyStateChanged()
         muteWriter.submit(muted)
     }
 

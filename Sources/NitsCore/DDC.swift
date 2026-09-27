@@ -185,4 +185,26 @@ public final class DDCChannel: @unchecked Sendable {
 
     public func set(_ vcp: VCP, value: UInt16) throws { try set(vcp.rawValue, value: value) }
     public func get(_ vcp: VCP) throws -> VCPReading { try get(vcp.rawValue) }
+
+    /// Reads with retries.
+    ///
+    /// DDC reads are genuinely flaky — a panel can return a malformed or empty frame
+    /// for no lasting reason, particularly the first read after a channel is opened.
+    /// A single failure must not be mistaken for a real value, because callers persist
+    /// what they read: treating a failed brightness read as 0 and later restoring it
+    /// would black out the display.
+    public func get(_ vcp: VCP, attempts: Int) throws -> VCPReading {
+        var lastError: Error = DDCError.unsupported
+        for attempt in 0..<max(1, attempts) {
+            do {
+                return try get(vcp.rawValue)
+            } catch {
+                lastError = error
+                if attempt < attempts - 1 {
+                    Thread.sleep(forTimeInterval: 0.05)
+                }
+            }
+        }
+        throw lastError
+    }
 }

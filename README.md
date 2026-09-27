@@ -8,11 +8,15 @@ degraded on recent macOS. *nit* is the unit of luminance.
 
 ## Status
 
-**M4 built, pending permission** — menu-bar app with live sliders, plus media-key
-interception, routing and an on-screen HUD. The key tap needs Accessibility
-permission, which cannot be granted programmatically; the app prompts on first launch
-and starts the tap as soon as it is granted, with no relaunch needed. Everything else
-works without it. See `docs/hardware.md` for measured timings and findings.
+**v1 feature-complete, pending one permission.** Menu-bar app with live sliders,
+media-key interception with an on-screen HUD, per-display persistence, restore on
+reconnect and wake, and opt-in launch at login.
+
+The media-key tap needs Accessibility permission, which cannot be granted
+programmatically; the app prompts on first launch and starts the tap the moment it is
+granted, with no relaunch. Everything else works without it.
+
+See `docs/hardware.md` for measured timings and findings.
 
 Notable: this monitor exposes **no settable CoreAudio volume**, so volume has to go
 over DDC VCP `0x62`. That also means macOS's own volume keys control nothing when the
@@ -70,7 +74,7 @@ cable, and whether the monitor's speakers expose a settable CoreAudio volume.
 - [x] **M2** volume: DDC `0x62` for this panel, CoreAudio where available
 - [x] **M3** menu-bar UI with live sliders
 - [x] **M4** event tap, custom HUD, key routing, fine steps *(needs Accessibility)*
-- [ ] **M5** persistence, reconnect handling, launch at login
+- [x] **M5** persistence, reconnect and wake handling, launch at login
 
 Deliberately out of scope for v1: sub-hardware-minimum software dimming,
 input-source switching (VCP `0x60`), named presets. Seams are left for each.

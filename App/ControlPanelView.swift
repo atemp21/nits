@@ -21,13 +21,32 @@ struct ControlPanelView: View {
 
             Divider().padding(.top, 12)
 
+            VStack(alignment: .leading, spacing: 6) {
+                Toggle("Restore levels on connect", isOn: $model.restoreOnConnect)
+                    .toggleStyle(.checkbox)
+                Toggle("Launch at login", isOn: $model.launchAtLogin)
+                    .toggleStyle(.checkbox)
+                if model.launchAtLoginNeedsApproval {
+                    Text("Approve nits in System Settings › General › Login Items.")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                if !model.hasAccessibilityPermission {
+                    Text("Grant Accessibility to control brightness with the keyboard.")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .font(.system(size: 11))
+            .padding(.top, 10)
+
             HStack {
                 Button("Quit nits") { NSApp.terminate(nil) }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                 Spacer()
             }
-            .padding(.top, 8)
+            .padding(.top, 10)
         }
         .padding(14)
         .frame(width: 290)

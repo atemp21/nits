@@ -45,7 +45,7 @@ final class DisplayViewModel: ObservableObject, Identifiable {
         self.volume = controller.volume
         self.isMuted = controller.isMuted
 
-        controller.onStateChange = { [weak self] in
+        controller.addStateObserver { [weak self] in
             Task { @MainActor in self?.syncFromHardware() }
         }
     }
@@ -90,12 +90,38 @@ final class DisplayViewModel: ObservableObject, Identifiable {
 final class AppModel: ObservableObject {
     @Published private(set) var displays: [DisplayViewModel] = []
 
+    @Published var restoreOnConnect: Bool {
+        didSet { manager.preferences.restoreOnConnect = restoreOnConnect }
+    }
+
+    @Published var launchAtLogin: Bool {
+        didSet {
+            guard launchAtLogin != LaunchAtLogin.isEnabled else { return }
+            LaunchAtLogin.setEnabled(launchAtLogin)
+            launchAtLoginNeedsApproval = LaunchAtLogin.requiresApproval
+        }
+    }
+
+    @Published var launchAtLoginNeedsApproval = false
+    @Published var hasAccessibilityPermission = MediaKeyTap.hasAccessibilityPermission
+
     private let manager = DisplayManager()
 
+    /// Flushes preferences on quit, where the debounced save would lose the last edit.
+    func saveNow() { manager.preferences.saveNow() }
+
+    func refreshPermissionState() {
+        hasAccessibilityPermission = MediaKeyTap.hasAccessibilityPermission
+    }
+
     init() {
+        self.restoreOnConnect = true
+        self.launchAtLogin = LaunchAtLogin.isEnabled
         manager.onControllersChanged = { [weak self] in
             Task { @MainActor in self?.rebuild() }
         }
+        restoreOnConnect = manager.preferences.restoreOnConnect
+        launchAtLoginNeedsApproval = LaunchAtLogin.requiresApproval
         manager.start()
         rebuild()
     }

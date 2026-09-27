@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import AppKit
 
 /// Owns a controller per attached display and keeps the set current as displays come
 /// and go.
@@ -14,15 +15,21 @@ public final class DisplayManager: @unchecked Sendable {
     /// Called after the controller set changes, on the main queue.
     public var onControllersChanged: (@Sendable () -> Void)?
 
+    public let preferences: PreferencesStore
+
     private let registry: DisplayRegistry
     private let api: PrivateDisplayAPI
     private let lock = NSLock()
     private let refreshQueue = DispatchQueue(label: "nits.refresh", qos: .userInitiated)
     private var isObserving = false
 
-    public init(api: PrivateDisplayAPI = SystemPrivateAPI.shared) {
+    public init(
+        api: PrivateDisplayAPI = SystemPrivateAPI.shared,
+        preferences: PreferencesStore = PreferencesStore()
+    ) {
         self.api = api
         self.registry = DisplayRegistry(api: api)
+        self.preferences = preferences
     }
 
     /// Builds controllers and reads their current hardware state.
@@ -32,6 +39,7 @@ public final class DisplayManager: @unchecked Sendable {
     public func start() {
         rebuild()
         beginObservingReconfiguration()
+        beginObservingWake()
     }
 
     public func controller(for displayID: CGDirectDisplayID) -> DisplayController? {
@@ -65,10 +73,88 @@ public final class DisplayManager: @unchecked Sendable {
         notifyControllersChanged()
 
         refreshQueue.async { [weak self] in
+            guard let self else { return }
             for controller in built {
                 controller.refresh()
+                self.restoreIfWanted(controller)
+                self.observeForPersistence(controller)
             }
-            self?.notifyControllersChanged()
+            self.notifyControllersChanged()
+        }
+    }
+
+    // MARK: - Persistence
+
+    /// Pushes stored levels back to a display that has just appeared.
+    ///
+    /// Monitors forget their level across a power cycle or an input switch, which is
+    /// the main reason this exists. Runs after `refresh()` so a display with no stored
+    /// settings simply keeps whatever it already had.
+    private func restoreIfWanted(_ controller: DisplayController) {
+        guard preferences.restoreOnConnect,
+              let stored = preferences.settings(for: controller.info.identity.key)
+        else { return }
+
+        if let brightness = stored.brightness, controller.canSetBrightness {
+            controller.setBrightness(brightness)
+        }
+        if let volume = stored.volume, controller.canSetVolume {
+            controller.setVolume(volume)
+        }
+        if let muted = stored.isMuted, controller.canSetVolume {
+            controller.setMuted(muted)
+        }
+    }
+
+    private func observeForPersistence(_ controller: DisplayController) {
+        // Seed immediately. Observers only fire on change, and refresh() has already
+        // run by now, so without this a display's levels are never recorded until the
+        // user happens to touch something — leaving restore-on-connect with nothing to
+        // restore.
+        persist(controller)
+
+        controller.addStateObserver { [weak self, weak controller] in
+            guard let self, let controller else { return }
+            self.persist(controller)
+        }
+    }
+
+    /// Records only values known to reflect the hardware. A level that was never read
+    /// must not be written down, or a failed read becomes a stored zero.
+    private func persist(_ controller: DisplayController) {
+        guard controller.hasBrightnessReading || controller.hasVolumeReading else { return }
+        preferences.update(controller.info.identity.key) { settings in
+            if controller.canSetBrightness, controller.hasBrightnessReading {
+                settings.brightness = controller.brightness
+            }
+            if controller.canSetVolume, controller.hasVolumeReading {
+                settings.volume = controller.volume
+                settings.isMuted = controller.isMuted
+            }
+        }
+    }
+
+    // MARK: - Wake
+
+    private func beginObservingWake() {
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.handleWake()
+        }
+    }
+
+    /// Re-applies known levels after sleep.
+    ///
+    /// A monitor commonly drops back to its own defaults across sleep, and since state
+    /// here is optimistic the app would otherwise keep reporting a level the panel no
+    /// longer has. Delayed because DDC is not reliable the instant a display wakes.
+    private func handleWake() {
+        refreshQueue.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            guard let self else { return }
+            for controller in self.controllers {
+                self.restoreIfWanted(controller)
+            }
         }
     }
 

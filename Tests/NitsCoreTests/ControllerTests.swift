@@ -17,6 +17,11 @@ final class FakePrivateAPI: PrivateDisplayAPI, @unchecked Sendable {
     /// Last VCP code requested by a read, so a reply can be framed for it.
     private var lastRequestedCode: UInt8?
 
+    /// When true, reads return a garbage frame, as a flaky panel does.
+    var failReads = false
+    /// Counts read attempts, to verify retry behaviour.
+    private(set) var readAttempts = 0
+
     init(supportsDDC: Bool = true) { self.supportsDDC = supportsDDC }
 
     var writes: [(code: UInt8, value: UInt16)] { lock.withLock { _writes } }
@@ -42,9 +47,15 @@ final class FakePrivateAPI: PrivateDisplayAPI, @unchecked Sendable {
         _ service: IOAVServiceRef, chip: UInt32, offset: UInt32, count: Int
     ) -> (IOReturn, [UInt8]) {
         lock.lock()
+        readAttempts += 1
         let code = lastRequestedCode ?? 0x10
         let reported = readValues[code] ?? (current: 0, maximum: 100)
+        let shouldFail = failReads
         lock.unlock()
+
+        if shouldFail {
+            return (KERN_SUCCESS, [UInt8](repeating: 0, count: count))
+        }
 
         var bytes: [UInt8] = [
             0x6E, 0x88, 0x02, 0x00, code, 0x00,
@@ -282,5 +293,62 @@ struct DisplayControllerTests {
         controller.setBrightness(0.5)
         controller.flush()
         #expect(api.writes.isEmpty)
+    }
+}
+
+
+@Suite("Failed reads")
+struct FailedReadTests {
+
+    /// Regression: a failed brightness read used to look like a genuine 0. That value
+    /// was persisted and restored on the next connect, blacking out the display.
+    @Test("a failed read is not mistaken for zero")
+    func failedReadIsNotZero() {
+        let api = FakePrivateAPI()
+        api.failReads = true
+        let controller = DisplayController(
+            info: makeDisplay(api: api, builtIn: false), audioDevice: nil, api: api)
+
+        controller.refresh()
+
+        #expect(!controller.hasBrightnessReading, "an unread level must not look valid")
+        #expect(!controller.hasVolumeReading)
+    }
+
+    @Test("a successful read marks the level valid")
+    func successfulReadIsValid() {
+        let api = FakePrivateAPI()
+        api.readValues[0x10] = (current: 80, maximum: 100)
+        let controller = DisplayController(
+            info: makeDisplay(api: api, builtIn: false), audioDevice: nil, api: api)
+
+        controller.refresh()
+
+        #expect(controller.hasBrightnessReading)
+        #expect(abs(controller.brightness - 0.8) < 0.001)
+    }
+
+    @Test("reads are retried before being given up on")
+    func readsAreRetried() {
+        let api = FakePrivateAPI()
+        api.failReads = true
+        let channel = DDCChannel(service: "fake" as CFString, api: api, interMessageDelay: 0)
+
+        #expect(throws: DDCError.self) { try channel.get(.brightness, attempts: 3) }
+        #expect(api.readAttempts == 3, "a flaky panel deserves more than one attempt")
+    }
+
+    @Test("a deliberate write makes the level authoritative despite a failed read")
+    func writeEstablishesValidity() {
+        let api = FakePrivateAPI()
+        api.failReads = true
+        let controller = DisplayController(
+            info: makeDisplay(api: api, builtIn: false), audioDevice: nil, api: api)
+
+        controller.refresh()
+        #expect(!controller.hasBrightnessReading)
+
+        controller.setBrightness(0.6)
+        #expect(controller.hasBrightnessReading, "we know the level: we just set it")
     }
 }

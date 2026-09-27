@@ -123,11 +123,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        model.saveNow()
+    }
+
     @objc private func togglePanel() {
         guard let button = statusItem.button else { return }
         if popover.isShown {
             popover.performClose(nil)
         } else {
+            model.refreshPermissionState()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             // Without this the popover cannot take key events reliably.
             popover.contentViewController?.view.window?.makeKey()

@@ -27,6 +27,10 @@ new wire-format logic goes in the codec with tests, not inline in `DDCChannel`.
 4. **Never key preferences on `CGDirectDisplayID`.** It is not stable across reconnect.
    Use `DisplayIdentity.key`.
 5. **The app must launch without Accessibility permission**, degrading to sliders only.
+6. **Never treat a failed DDC read as a value.** Reads are flaky; retry, and track
+   whether a level was ever actually obtained. A failed brightness read that looks
+   like 0 gets persisted and restored onto the panel later, blacking out the display.
+   `DisplayController.hasBrightnessReading` exists for this.
 
 ## Hardware caveats
 
