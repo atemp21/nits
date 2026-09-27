@@ -8,8 +8,9 @@ degraded on recent macOS. *nit* is the unit of luminance.
 
 ## Status
 
-**M1 complete** — DDC brightness, contrast, volume and mute all confirmed working
-against a Samsung C34J79x over USB-C, reads and writes both. No app bundle yet.
+**M3 complete** — a working menu-bar app with live brightness and volume sliders per
+display, on top of DDC/CoreAudio backends confirmed against a Samsung C34J79x.
+Media-key interception and the HUD are still to come (M4).
 See `docs/hardware.md` for measured timings and the full findings.
 
 Notable: this monitor exposes **no settable CoreAudio volume**, so volume has to go
@@ -27,13 +28,17 @@ media-key interception (`CGEventTap`) is likewise native-only.
 ## Layout
 
 ```
-Sources/NitsCore/       logic, no UI, testable without hardware
-  PrivateAPI.swift      the ONLY file touching undeclared symbols
-  DDC.swift             VCP framing + I2C transactions
-  DisplayRegistry.swift CGDisplay <-> IORegistry AV service matching
-  Audio.swift           CoreAudio volume
-Sources/nitsprobe/      diagnostics CLI
-App/                    app bundle sources (from M3)
+Sources/NitsCore/          logic, no UI, testable without hardware
+  PrivateAPI.swift         the ONLY file touching undeclared symbols
+  DDC.swift                VCP framing + I2C transactions
+  DisplayRegistry.swift    CGDisplay <-> IORegistry AV service matching
+  Audio.swift              CoreAudio volume
+  Coalescer.swift          latest-wins writes in front of slow hardware
+  DisplayController.swift  per-display state, picks its backends by capability
+  DisplayManager.swift     owns controllers, rebuilds on reconnect
+Sources/nitsprobe/         diagnostics CLI
+App/                       menu-bar app (AppKit shell, SwiftUI panel)
+project.yml                Xcode project spec; the .xcodeproj is generated
 ```
 
 `PrivateAPI.swift` resolves every undeclared symbol with `dlsym` at runtime rather
@@ -44,11 +49,14 @@ why comparable tools break across OS upgrades.
 ## Usage
 
 ```sh
-make build   # build core + probe
 make test    # unit tests, no hardware needed
 make probe   # hardware diagnostics, read-only
-make probe-write B=50   # writes brightness 50 over DDC
+make run     # build and launch the menu-bar app
+make stop    # quit it
 ```
+
+`make app` and `make run` need `brew install xcodegen`; the `.xcodeproj` is generated
+from `project.yml` rather than checked in, so build settings stay diffable.
 
 Run `make probe` with the monitor attached to find out whether DDC works on your
 cable, and whether the monitor's speakers expose a settable CoreAudio volume.
@@ -57,8 +65,8 @@ cable, and whether the monitor's speakers expose a settable CoreAudio volume.
 
 - [x] **M0** core modules, probe CLI, unit tests
 - [x] **M1** DDC confirmed against the panel — the approach works
-- [ ] **M2** volume: DDC `0x62` for this panel, CoreAudio where available
-- [ ] **M3** menu-bar UI with live sliders
+- [x] **M2** volume: DDC `0x62` for this panel, CoreAudio where available
+- [x] **M3** menu-bar UI with live sliders
 - [ ] **M4** event tap, custom HUD, key routing, fine steps
 - [ ] **M5** persistence, reconnect handling, launch at login
 

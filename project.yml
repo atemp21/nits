@@ -1,0 +1,44 @@
+name: nits
+options:
+  bundleIdPrefix: com.aarontempleton
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+packages:
+  NitsCore:
+    path: .
+
+targets:
+  nits:
+    type: application
+    platform: macOS
+    sources:
+      - App
+    dependencies:
+      - package: NitsCore
+        product: NitsCore
+    info:
+      path: App/Info.plist
+      properties:
+        # Menu-bar agent: no Dock icon, no main window.
+        LSUIElement: true
+        CFBundleName: nits
+        CFBundleDisplayName: nits
+        NSHumanReadableCopyright: ""
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aarontempleton.nits
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "6.0"
+        # Unsandboxed by necessity: DDC needs private IOKit calls and IORegistry
+        # access. This permanently rules out Mac App Store distribution.
+        ENABLE_APP_SANDBOX: NO
+        ENABLE_HARDENED_RUNTIME: NO
+        # Ad-hoc signing is fine for personal use. A notarized build would need a
+        # Developer ID identity and hardened runtime enabled.
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: YES
+        COMBINE_HIDPI_IMAGES: YES

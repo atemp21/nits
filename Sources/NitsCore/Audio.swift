@@ -216,12 +216,15 @@ public enum AudioControl {
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain)
         guard AudioObjectHasProperty(id, &address) else { return nil }
-        var value: CFString? = nil
-        var size = UInt32(MemoryLayout<CFString?>.size)
-        guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value) == noErr else {
-            return nil
-        }
-        return value as String?
+        // CoreAudio hands back a +1 CFString here, so it must be received as an
+        // Unmanaged reference and released. Binding a `CFString?` directly would let
+        // Swift form a raw pointer to an object reference, and leak it.
+        var value: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value) == noErr,
+              let value
+        else { return nil }
+        return value.takeRetainedValue() as String
     }
 
     private static func outputChannelCount(_ id: AudioDeviceID) -> Int {

@@ -1,0 +1,110 @@
+import SwiftUI
+import NitsCore
+
+/// The menu-bar panel. Deliberately plain: this is a system utility, so it should
+/// read as part of macOS rather than announce itself.
+struct ControlPanelView: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if model.displays.isEmpty {
+                Text("No displays found")
+                    .foregroundStyle(.secondary)
+                    .padding()
+            } else {
+                ForEach(Array(model.displays.enumerated()), id: \.element.id) { index, display in
+                    if index > 0 { Divider().padding(.vertical, 10) }
+                    DisplaySectionView(display: display)
+                }
+            }
+
+            Divider().padding(.top, 12)
+
+            HStack {
+                Button("Quit nits") { NSApp.terminate(nil) }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.top, 8)
+        }
+        .padding(14)
+        .frame(width: 290)
+    }
+}
+
+private struct DisplaySectionView: View {
+    @ObservedObject var display: DisplayViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Text(display.name)
+                    .font(.system(size: 12, weight: .semibold))
+                Spacer()
+                Text(display.backendSummary)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+
+            if display.canSetBrightness {
+                SliderRow(
+                    systemImage: "sun.max.fill",
+                    value: Binding(
+                        get: { display.brightness },
+                        set: { display.setBrightness($0) }),
+                    onEditingChanged: { editing in
+                        editing ? display.beginEditing() : display.endEditing()
+                    })
+            }
+
+            if display.canSetVolume {
+                HStack(spacing: 8) {
+                    Button {
+                        display.toggleMute()
+                    } label: {
+                        Image(systemName: display.isMuted
+                              ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                            .frame(width: 16)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(display.isMuted ? .secondary : .primary)
+                    .help(display.isMuted ? "Unmute" : "Mute")
+
+                    Slider(
+                        value: Binding(
+                            get: { display.volume },
+                            set: { display.setVolume($0) }),
+                        in: 0...1,
+                        onEditingChanged: { editing in
+                            editing ? display.beginEditing() : display.endEditing()
+                        })
+                    .controlSize(.small)
+                    .disabled(display.isMuted)
+                }
+            }
+
+            if !display.canSetBrightness && !display.canSetVolume {
+                Text("No controllable features")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+private struct SliderRow: View {
+    let systemImage: String
+    @Binding var value: Float
+    let onEditingChanged: (Bool) -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: systemImage)
+                .frame(width: 16)
+            Slider(value: $value, in: 0...1, onEditingChanged: onEditingChanged)
+                .controlSize(.small)
+        }
+    }
+}

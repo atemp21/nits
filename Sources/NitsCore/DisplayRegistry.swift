@@ -167,7 +167,14 @@ public struct DisplayRegistry {
     static func className(of entry: io_registry_entry_t) -> String? {
         var buffer = [CChar](repeating: 0, count: 128)
         guard IOObjectGetClass(entry, &buffer) == KERN_SUCCESS else { return nil }
-        return String(cString: buffer)
+        return Self.string(fromNullTerminated: buffer)
+    }
+
+    /// IOKit fills fixed-size C buffers, so the trailing NULs have to go before
+    /// decoding. `String(cString:)` is deprecated for array arguments.
+    private static func string(fromNullTerminated buffer: [CChar]) -> String {
+        let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+        return String(decoding: bytes, as: UTF8.self)
     }
 
     static func path(of entry: io_registry_entry_t) -> String? {
@@ -175,7 +182,7 @@ public struct DisplayRegistry {
         guard IORegistryEntryGetPath(entry, kIOServicePlane, &buffer) == KERN_SUCCESS else {
             return nil
         }
-        return String(cString: buffer)
+        return Self.string(fromNullTerminated: buffer)
     }
 
     static func property(_ entry: io_registry_entry_t, _ key: String) -> Any? {
