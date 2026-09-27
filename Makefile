@@ -1,4 +1,4 @@
-.PHONY: help build test probe probe-write clean gen app run stop
+.PHONY: help build test probe probe-write clean gen app run run-panel stop shots
 
 help:
 	@echo "nits — targets:"
@@ -46,6 +46,13 @@ run-panel: app stop
 
 stop:
 	@pkill -f 'nits.app/Contents/MacOS/nits' 2>/dev/null || true
+
+# Offscreen renders for design review; needs no Screen Recording permission.
+SHOT_DIR ?= build/shots
+shots: app
+	@mkdir -p $(SHOT_DIR)
+	@"$(APP_PATH)/Contents/MacOS/nits" --render-panel $(SHOT_DIR)/panel.png
+	@"$(APP_PATH)/Contents/MacOS/nits" --render-hud $(SHOT_DIR)/hud.png
 
 clean:
 	swift package clean

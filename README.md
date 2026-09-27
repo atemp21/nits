@@ -8,10 +8,11 @@ degraded on recent macOS. *nit* is the unit of luminance.
 
 ## Status
 
-**M3 complete** — a working menu-bar app with live brightness and volume sliders per
-display, on top of DDC/CoreAudio backends confirmed against a Samsung C34J79x.
-Media-key interception and the HUD are still to come (M4).
-See `docs/hardware.md` for measured timings and the full findings.
+**M4 built, pending permission** — menu-bar app with live sliders, plus media-key
+interception, routing and an on-screen HUD. The key tap needs Accessibility
+permission, which cannot be granted programmatically; the app prompts on first launch
+and starts the tap as soon as it is granted, with no relaunch needed. Everything else
+works without it. See `docs/hardware.md` for measured timings and findings.
 
 Notable: this monitor exposes **no settable CoreAudio volume**, so volume has to go
 over DDC VCP `0x62`. That also means macOS's own volume keys control nothing when the
@@ -53,6 +54,7 @@ make test    # unit tests, no hardware needed
 make probe   # hardware diagnostics, read-only
 make run     # build and launch the menu-bar app
 make stop    # quit it
+make shots   # render the panel and HUD to PNGs for design review
 ```
 
 `make app` and `make run` need `brew install xcodegen`; the `.xcodeproj` is generated
@@ -67,7 +69,7 @@ cable, and whether the monitor's speakers expose a settable CoreAudio volume.
 - [x] **M1** DDC confirmed against the panel — the approach works
 - [x] **M2** volume: DDC `0x62` for this panel, CoreAudio where available
 - [x] **M3** menu-bar UI with live sliders
-- [ ] **M4** event tap, custom HUD, key routing, fine steps
+- [x] **M4** event tap, custom HUD, key routing, fine steps *(needs Accessibility)*
 - [ ] **M5** persistence, reconnect handling, launch at login
 
 Deliberately out of scope for v1: sub-hardware-minimum software dimming,

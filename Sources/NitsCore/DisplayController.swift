@@ -32,6 +32,10 @@ public final class DisplayController: @unchecked Sendable {
     public let brightnessBackend: BrightnessBackend
     public let volumeBackend: VolumeBackend
 
+    /// The audio device associated with this display, whether or not its volume is
+    /// settable. Volume keys use this to target whichever display is actually playing.
+    public let audioDeviceID: AudioDeviceID?
+
     /// Called after state changes, on an arbitrary queue. The UI hops to main itself.
     public var onStateChange: (@Sendable () -> Void)?
 
@@ -57,6 +61,7 @@ public final class DisplayController: @unchecked Sendable {
     ) {
         self.info = info
         self.api = api
+        self.audioDeviceID = audioDevice?.id
 
         if info.isBuiltIn {
             brightnessBackend = api.canChangeNativeBrightness(info.id) ? .native : .unavailable
