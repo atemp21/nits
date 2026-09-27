@@ -20,8 +20,10 @@ new wire-format logic goes in the codec with tests, not inline in `DDCChannel`.
 2. **Never poll DDC.** Reads are slow and unreliable; read once on connect and keep
    optimistic local state. Writes are coalesced on a ~25ms debounce. Samsung panels
    stall when I2C is hammered, and that is most of why competing apps feel laggy.
-3. **Prefer CoreAudio to DDC for volume.** VCP `0x62` is the fallback for panels whose
-   audio device exposes no settable volume, not the default path.
+3. **Choose the volume path per device, by capability.** Use CoreAudio when
+   `AudioDevice.hasSettableVolume` is true, otherwise DDC VCP `0x62` and mute `0x8D`.
+   Never hardcode one path: the C34J79x reports `settableVolume=false`, so it is
+   DDC-only, while the built-in speakers are CoreAudio. See `docs/hardware.md`.
 4. **Never key preferences on `CGDirectDisplayID`.** It is not stable across reconnect.
    Use `DisplayIdentity.key`.
 5. **The app must launch without Accessibility permission**, degrading to sliders only.

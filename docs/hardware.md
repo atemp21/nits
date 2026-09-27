@@ -8,6 +8,18 @@ for what works, and exists because Apple Silicon DDC support varies by port.
 - MacBook Pro (MacBookPro18,1), Apple M1 Pro
 - macOS 26.6.2 (Darwin 25.6.0), arm64
 
+## Display
+
+Samsung C34J79x (CJ79 34" ultrawide), with built-in speakers.
+
+| Property | Value |
+| --- | --- |
+| EDID product id | `0x0f1e` (3870) |
+| EDID serial | 809056048 |
+| Product name | `C34J79x` |
+| Identity key | `19501-3870-809056048-External` |
+| DCP path | `dcpext0@89C00000` → `dispext0:dcpav-service-epic:0/DCPAVServiceProxy` |
+
 ## Private API availability
 
 Verified present on macOS 26.6.2:
@@ -19,25 +31,60 @@ Verified present on macOS 26.6.2:
 | `DisplayServicesGetBrightness` / `SetBrightness` | DisplayServices | built-in panel |
 | `DisplayServicesCanChangeBrightness` | DisplayServices | capability check |
 
-With no external display attached, the IORegistry shows 2 `DCPAVServiceProxy` nodes,
-the internal panel's being tagged `Location = "Embedded"`.
+Note: the *internal* panel's `DisplayAttributes.ProductAttributes.ProductID` is a
+fourcc (`0x30313441`, `"A410"`), not an EDID product code. External displays report a
+real EDID product id, so product-id matching works for the displays that need DDC.
 
 ## Cable matrix
 
-Fill in by running `make probe` with the monitor on each port. HDMI is the least
-reliable DDC path on Apple Silicon; if only USB-C works, that is a documented
-requirement rather than a bug.
-
-| Connection | External AV service? | VCP 0x10 read | 0x10 write | 0x62 volume | Audio device settable |
+| Connection | External AV service | VCP 0x10 read | 0x10 write | 0x62 volume | CoreAudio volume settable |
 | --- | --- | --- | --- | --- | --- |
-| USB-C / DisplayPort | ? | ? | ? | ? | ? |
-| HDMI | ? | ? | ? | ? | ? |
+| USB-C / DisplayPort | yes | yes (100/100) | yes | yes (max 100) | **no** |
+| HDMI | untested | untested | untested | untested | untested |
 
-## Volume path
+USB-C works fully. HDMI remains untested; there is no need to use it, and it is the
+least reliable DDC path on Apple Silicon.
 
-Decided by `make probe`:
+## Supported VCP codes
 
-- Monitor speakers listed with `settableVolume=true` → use CoreAudio (preferred:
-  public API, instant, accurate state).
-- Listed with `settableVolume=false`, or absent → the panel owns the level, so drive
-  DDC VCP `0x62` instead.
+All confirmed by read on the C34J79x:
+
+| Code | Feature | Current | Max |
+| --- | --- | --- | --- |
+| `0x10` | brightness | 100 | 100 |
+| `0x12` | contrast | 75 | 100 |
+| `0x62` | audio volume | 19 | 100 |
+| `0x8D` | audio mute | 2 (unmuted) | 2 |
+
+Reply frames arrive with a leading source-address byte, e.g.
+`6e 88 02 00 10 00 00 64 00 64 a4 6e`. The parser locates the `0x88` length marker
+rather than assuming an offset, so this needs no special-casing.
+
+## Volume path: DDC, not CoreAudio
+
+**The monitor's CoreAudio device reports `settableVolume=false` and `hasMute=false`,
+and its volume is unreadable.** It enumerates as a DisplayPort output device and
+audio plays through it, but the panel owns the level entirely.
+
+So volume must go over DDC VCP `0x62`, with mute on `0x8D`. This is the opposite of
+the original plan's preferred path, and it raises the value of the app: with this
+monitor as the default output, the Mac's own volume keys have nothing to control, so
+translating them to DDC is the whole point rather than a nicety.
+
+## Timing
+
+Measured over USB-C. The I2C call itself is only ~3.6ms; the inter-message delay
+dominates, so it is configurable on `DDCChannel`.
+
+| Added delay | 60 writes | per write | All landed | Panel responsive after |
+| --- | --- | --- | --- | --- |
+| 0ms | 215ms | 3.6ms | yes, 0 errors | yes |
+| 4ms | 508ms | 8.5ms | yes, 0 errors | yes |
+| 40ms (VESA spec) | ~2.8s | 46.6ms | yes | yes |
+
+A single read costs ~110ms at the spec delay, which is why reads happen once on
+connect and never in a loop.
+
+This panel tolerates zero added delay under a sustained 60-write burst. The default
+is nevertheless **8ms**, for margin on less robust panels while staying inside one
+frame. Write coalescing stays in the design regardless, to bound queue growth.

@@ -129,11 +129,26 @@ public final class DDCChannel: @unchecked Sendable {
     private let lock = NSLock()
 
     /// DDC/CI requires a gap between transactions; panels drop messages otherwise.
-    private static let interMessageDelay: TimeInterval = 0.05
+    ///
+    /// The VESA spec says 40ms, but real panels vary widely and this delay dominates
+    /// write cost (the I2C call itself is only a few ms). It is configurable so the
+    /// floor can be measured per panel rather than guessed — see docs/hardware.md.
+    ///
+    /// Measured on a Samsung C34J79x over USB-C: 60 uncoalesced writes at zero added
+    /// delay all landed, with the panel still answering reads afterwards. The 8ms
+    /// default keeps a safety margin for less robust panels while staying well inside
+    /// one display frame, so a slider drag feels immediate.
+    public static let specInterMessageDelay: TimeInterval = 0.008
+    public let interMessageDelay: TimeInterval
 
-    public init(service: IOAVServiceRef, api: PrivateDisplayAPI = SystemPrivateAPI.shared) {
+    public init(
+        service: IOAVServiceRef,
+        api: PrivateDisplayAPI = SystemPrivateAPI.shared,
+        interMessageDelay: TimeInterval = DDCChannel.specInterMessageDelay
+    ) {
         self.service = service
         self.api = api
+        self.interMessageDelay = interMessageDelay
     }
 
     public func set(_ code: UInt8, value: UInt16) throws {
@@ -145,7 +160,7 @@ public final class DDCChannel: @unchecked Sendable {
         let result = api.writeI2C(
             service, chip: DDCCodec.chipAddress, offset: DDCCodec.dataOffset, bytes: packet)
         guard result == kIOReturnSuccess else { throw DDCError.writeFailed(result) }
-        Thread.sleep(forTimeInterval: Self.interMessageDelay)
+        Thread.sleep(forTimeInterval: interMessageDelay)
     }
 
     public func get(_ code: UInt8) throws -> VCPReading {
@@ -158,12 +173,12 @@ public final class DDCChannel: @unchecked Sendable {
             service, chip: DDCCodec.chipAddress, offset: DDCCodec.dataOffset, bytes: request)
         guard written == kIOReturnSuccess else { throw DDCError.writeFailed(written) }
 
-        Thread.sleep(forTimeInterval: Self.interMessageDelay)
+        Thread.sleep(forTimeInterval: interMessageDelay)
 
         let (result, buffer) = api.readI2C(
             service, chip: DDCCodec.chipAddress, offset: DDCCodec.dataOffset, count: 12)
         guard result == kIOReturnSuccess else { throw DDCError.readFailed(result) }
-        Thread.sleep(forTimeInterval: Self.interMessageDelay)
+        Thread.sleep(forTimeInterval: interMessageDelay)
 
         return try DDCCodec.parseReply(buffer, expecting: code)
     }

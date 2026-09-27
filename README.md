@@ -8,8 +8,13 @@ degraded on recent macOS. *nit* is the unit of luminance.
 
 ## Status
 
-**M0 complete** — core modules and the diagnostic CLI build and run. No app bundle
-yet. See `docs/hardware.md` for what has been verified on real hardware.
+**M1 complete** — DDC brightness, contrast, volume and mute all confirmed working
+against a Samsung C34J79x over USB-C, reads and writes both. No app bundle yet.
+See `docs/hardware.md` for measured timings and the full findings.
+
+Notable: this monitor exposes **no settable CoreAudio volume**, so volume has to go
+over DDC VCP `0x62`. That also means macOS's own volume keys control nothing when the
+monitor is the default output — which is precisely the gap this app closes.
 
 ## Why native Swift
 
@@ -51,8 +56,8 @@ cable, and whether the monitor's speakers expose a settable CoreAudio volume.
 ## Roadmap
 
 - [x] **M0** core modules, probe CLI, unit tests
-- [ ] **M1** DDC brightness confirmed against the panel *(gate: proves the approach)*
-- [ ] **M2** volume via CoreAudio, DDC fallback
+- [x] **M1** DDC confirmed against the panel — the approach works
+- [ ] **M2** volume: DDC `0x62` for this panel, CoreAudio where available
 - [ ] **M3** menu-bar UI with live sliders
 - [ ] **M4** event tap, custom HUD, key routing, fine steps
 - [ ] **M5** persistence, reconnect handling, launch at login
