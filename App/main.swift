@@ -34,6 +34,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.togglePanel()
             }
         }
+
+        // Renders the panel to a PNG and exits. The delay lets the initial DDC reads
+        // land, so the snapshot shows real hardware values rather than zeroes.
+        if let path = PanelSnapshot.requestedPath(from: CommandLine.arguments) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [model] in
+                let ok = PanelSnapshot.render(model: model, to: path)
+                NSApp.terminate(nil)
+                exit(ok ? 0 : 1)
+            }
+        }
     }
 
     @objc private func togglePanel() {
