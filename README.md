@@ -1,16 +1,16 @@
 # nits
 
-A focused macOS menu-bar app for controlling external monitor brightness and volume,
-and for making the Mac's own brightness/volume controls more precise.
+A focused macOS menu-bar app for controlling external monitor brightness, contrast
+and volume, and for making the Mac's own brightness/volume controls more precise.
 
 Built because BetterDisplay Pro does far more than needed and MonitorControl has
 degraded on recent macOS. *nit* is the unit of luminance.
 
 ## Status
 
-**v1 feature-complete, pending one permission.** Menu-bar app with live sliders,
-media-key interception with an on-screen HUD, per-display persistence, restore on
-reconnect and wake, and opt-in launch at login.
+**v1 feature-complete, pending one permission.** Menu-bar app with live sliders for
+brightness, volume and contrast, media-key interception with an on-screen HUD,
+per-display persistence, restore on reconnect and wake, and opt-in launch at login.
 
 The media-key tap needs Accessibility permission, which cannot be granted
 programmatically; the app prompts on first launch and starts the tap the moment it is
@@ -75,6 +75,7 @@ cable, and whether the monitor's speakers expose a settable CoreAudio volume.
 - [x] **M3** menu-bar UI with live sliders
 - [x] **M4** event tap, custom HUD, key routing, fine steps *(needs Accessibility)*
 - [x] **M5** persistence, reconnect and wake handling, launch at login
+- [x] **M6** contrast slider (VCP `0x12`), shown only where the panel answers the read
 
 Deliberately out of scope for v1: sub-hardware-minimum software dimming,
 input-source switching (VCP `0x60`), named presets. Seams are left for each.

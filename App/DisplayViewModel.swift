@@ -12,6 +12,12 @@ final class DisplayViewModel: ObservableObject, Identifiable {
     @Published var brightness: Float
     @Published var volume: Float
     @Published var isMuted: Bool
+    @Published var contrast: Float
+
+    /// Mirrored rather than computed, because it can turn true after the first DDC
+    /// read lands. A computed property off the controller would not republish, and the
+    /// slider would stay hidden on a panel that does support contrast.
+    @Published var canSetContrast: Bool
 
     /// True while the user is dragging, so hardware-originated updates do not fight
     /// the slider under their cursor.
@@ -44,6 +50,10 @@ final class DisplayViewModel: ObservableObject, Identifiable {
         self.brightness = controller.brightness
         self.volume = controller.volume
         self.isMuted = controller.isMuted
+        self.contrast = controller.contrast
+        // Contrast is optional in MCCS, so it is offered only once the panel has
+        // actually answered a 0x12 read.
+        self.canSetContrast = controller.canSetContrast && controller.hasContrastReading
 
         controller.addStateObserver { [weak self] in
             Task { @MainActor in self?.syncFromHardware() }
@@ -59,6 +69,11 @@ final class DisplayViewModel: ObservableObject, Identifiable {
         volume = value
         if value > 0 { isMuted = false }
         controller.setVolume(value)
+    }
+
+    func setContrast(_ value: Float) {
+        contrast = value
+        controller.setContrast(value)
     }
 
     func toggleMute() {
@@ -81,6 +96,13 @@ final class DisplayViewModel: ObservableObject, Identifiable {
         }
         if isMuted != controller.isMuted {
             isMuted = controller.isMuted
+        }
+        if abs(contrast - controller.contrast) > 0.005 {
+            contrast = controller.contrast
+        }
+        let contrastAvailable = controller.canSetContrast && controller.hasContrastReading
+        if canSetContrast != contrastAvailable {
+            canSetContrast = contrastAvailable
         }
     }
 }

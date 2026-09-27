@@ -255,6 +255,35 @@ struct DisplayControllerTests {
         #expect(api.writes.last?.value == 2)
     }
 
+    @Test("contrast scales onto the panel's own range")
+    func contrastScaling() {
+        let api = FakePrivateAPI()
+        api.readValues[0x12] = (current: 75, maximum: 100)
+        let controller = DisplayController(
+            info: makeDisplay(api: api, builtIn: false), audioDevice: nil, api: api)
+
+        #expect(controller.contrastBackend == .ddc)
+        controller.refresh()
+        #expect(abs(controller.contrast - 0.75) < 0.001)
+
+        controller.setContrast(0.4)
+        controller.flush()
+        #expect(api.writes.contains { $0.code == 0x12 && $0.value == 40 })
+    }
+
+    @Test("the built-in panel offers no contrast, having no DDC channel")
+    func builtInHasNoContrast() {
+        let api = FakePrivateAPI()
+        let controller = DisplayController(
+            info: makeDisplay(api: api, builtIn: true, ddc: false),
+            audioDevice: nil, api: api)
+
+        #expect(controller.contrastBackend == .unavailable)
+        controller.setContrast(0.5)
+        controller.flush()
+        #expect(api.writes.isEmpty)
+    }
+
     @Test("state updates before the hardware write, so the UI never lags")
     func optimisticState() {
         let api = FakePrivateAPI()
@@ -336,6 +365,22 @@ struct FailedReadTests {
 
         #expect(throws: DDCError.self) { try channel.get(.brightness, attempts: 3) }
         #expect(api.readAttempts == 3, "a flaky panel deserves more than one attempt")
+    }
+
+    /// The UI hides the contrast slider unless this is true, because a panel that does
+    /// not implement 0x12 is indistinguishable from one that does except by its refusal
+    /// to answer the read.
+    @Test("an unanswered contrast read leaves contrast unreported")
+    func unsupportedContrastHasNoReading() {
+        let api = FakePrivateAPI()
+        api.failReads = true
+        let controller = DisplayController(
+            info: makeDisplay(api: api, builtIn: false), audioDevice: nil, api: api)
+
+        controller.refresh()
+
+        #expect(controller.canSetContrast, "the transport is there even if the panel refused")
+        #expect(!controller.hasContrastReading)
     }
 
     @Test("a deliberate write makes the level authoritative despite a failed read")

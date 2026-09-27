@@ -45,8 +45,6 @@ Left out of v1 deliberately, with seams already in place.
 - [ ] **Input source switching** (VCP `0x60`). Confirmed readable on the C34J79x.
       Useful for flipping the monitor between the Mac and another machine.
 - [ ] **Named presets** per display, optionally auto-applied on connect.
-- [ ] **Contrast control.** Already read and written by the core (VCP `0x12`, currently
-      75 on the C34J79x); simply not surfaced in the UI.
 
 ## Release readiness
 

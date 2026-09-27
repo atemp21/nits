@@ -78,6 +78,17 @@ private struct DisplaySectionView: View {
                     })
             }
 
+            if display.canSetContrast {
+                SliderRow(
+                    systemImage: "circle.righthalf.filled",
+                    value: Binding(
+                        get: { display.contrast },
+                        set: { display.setContrast($0) }),
+                    onEditingChanged: { editing in
+                        editing ? display.beginEditing() : display.endEditing()
+                    })
+            }
+
             if display.canSetVolume {
                 HStack(spacing: 8) {
                     Button {
@@ -104,7 +115,7 @@ private struct DisplaySectionView: View {
                 }
             }
 
-            if !display.canSetBrightness && !display.canSetVolume {
+            if !display.canSetBrightness && !display.canSetVolume && !display.canSetContrast {
                 Text("No controllable features")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)

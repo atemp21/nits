@@ -104,6 +104,12 @@ public final class DisplayManager: @unchecked Sendable {
         if let muted = stored.isMuted, controller.canSetVolume {
             controller.setMuted(muted)
         }
+        // Restored on transport alone, not on this session's read having landed: a
+        // stored value only exists because some earlier session read 0x12 from this
+        // same panel, so a flaky read now is no reason to leave contrast behind.
+        if let contrast = stored.contrast, controller.canSetContrast {
+            controller.setContrast(contrast)
+        }
     }
 
     private func observeForPersistence(_ controller: DisplayController) {
@@ -122,7 +128,10 @@ public final class DisplayManager: @unchecked Sendable {
     /// Records only values known to reflect the hardware. A level that was never read
     /// must not be written down, or a failed read becomes a stored zero.
     private func persist(_ controller: DisplayController) {
-        guard controller.hasBrightnessReading || controller.hasVolumeReading else { return }
+        guard controller.hasBrightnessReading
+                || controller.hasVolumeReading
+                || controller.hasContrastReading
+        else { return }
         preferences.update(controller.info.identity.key) { settings in
             if controller.canSetBrightness, controller.hasBrightnessReading {
                 settings.brightness = controller.brightness
@@ -130,6 +139,9 @@ public final class DisplayManager: @unchecked Sendable {
             if controller.canSetVolume, controller.hasVolumeReading {
                 settings.volume = controller.volume
                 settings.isMuted = controller.isMuted
+            }
+            if controller.canSetContrast, controller.hasContrastReading {
+                settings.contrast = controller.contrast
             }
         }
     }

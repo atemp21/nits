@@ -21,6 +21,7 @@ struct PreferencesTests {
             settings.brightness = 0.42
             settings.volume = 0.19
             settings.isMuted = true
+            settings.contrast = 0.75
         }
         store.saveNow()
 
@@ -29,6 +30,7 @@ struct PreferencesTests {
         #expect(settings?.brightness == 0.42)
         #expect(settings?.volume == 0.19)
         #expect(settings?.isMuted == true)
+        #expect(settings?.contrast == 0.75)
     }
 
     @Test("displays are kept separate by identity key")
@@ -66,6 +68,21 @@ struct PreferencesTests {
         store.saveNow()
 
         #expect(PreferencesStore(url: url).restoreOnConnect == false)
+    }
+
+    /// Settings files written before contrast existed must still load.
+    @Test("a settings file with no contrast field decodes")
+    func decodesWithoutContrast() throws {
+        let url = temporaryURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let json = #"{"displays":{"key":{"brightness":0.3}},"restoreOnConnect":true}"#
+        try Data(json.utf8).write(to: url)
+
+        let store = PreferencesStore(url: url)
+        #expect(store.settings(for: "key")?.brightness == 0.3)
+        #expect(store.settings(for: "key")?.contrast == nil)
     }
 
     @Test("an unknown display has no settings")

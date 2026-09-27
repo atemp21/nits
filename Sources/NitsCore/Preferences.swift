@@ -5,11 +5,18 @@ public struct DisplaySettings: Codable, Equatable, Sendable {
     public var brightness: Float?
     public var volume: Float?
     public var isMuted: Bool?
+    public var contrast: Float?
 
-    public init(brightness: Float? = nil, volume: Float? = nil, isMuted: Bool? = nil) {
+    public init(
+        brightness: Float? = nil,
+        volume: Float? = nil,
+        isMuted: Bool? = nil,
+        contrast: Float? = nil
+    ) {
         self.brightness = brightness
         self.volume = volume
         self.isMuted = isMuted
+        self.contrast = contrast
     }
 }
 

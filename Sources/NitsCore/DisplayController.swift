@@ -28,9 +28,17 @@ public final class DisplayController: @unchecked Sendable {
         public var isDDC: Bool { self == .ddc }
     }
 
+    /// Contrast has no native equivalent, so it exists only where DDC does.
+    public enum ContrastBackend: String, Sendable {
+        /// DDC VCP 0x12.
+        case ddc
+        case unavailable
+    }
+
     public let info: DisplayInfo
     public let brightnessBackend: BrightnessBackend
     public let volumeBackend: VolumeBackend
+    public let contrastBackend: ContrastBackend
 
     /// The audio device associated with this display, whether or not its volume is
     /// settable. Volume keys use this to target whichever display is actually playing.
@@ -60,6 +68,7 @@ public final class DisplayController: @unchecked Sendable {
     private var _brightness: Float = 0
     private var _volume: Float = 0
     private var _isMuted = false
+    private var _contrast: Float = 0
 
     /// Whether a real value was ever obtained from the hardware.
     ///
@@ -68,14 +77,17 @@ public final class DisplayController: @unchecked Sendable {
     /// and is restored onto the panel later — blacking out the display.
     private var _hasBrightnessReading = false
     private var _hasVolumeReading = false
+    private var _hasContrastReading = false
 
     /// DDC reports its own scale; do not assume 100.
     private var brightnessMax: UInt16 = 100
     private var volumeMax: UInt16 = 100
+    private var contrastMax: UInt16 = 100
 
     private let brightnessWriter: CoalescingWriter<Float>
     private let volumeWriter: CoalescingWriter<Float>
     private let muteWriter: CoalescingWriter<Bool>
+    private let contrastWriter: CoalescingWriter<Float>
 
     public init(
         info: DisplayInfo,
@@ -92,6 +104,9 @@ public final class DisplayController: @unchecked Sendable {
             brightnessBackend = info.supportsDDC ? .ddc : .unavailable
         }
 
+        // The built-in panel has no DDC channel at all, so contrast is external-only.
+        contrastBackend = (!info.isBuiltIn && info.supportsDDC) ? .ddc : .unavailable
+
         // Capability decides the volume path, never the display type. A monitor whose
         // audio device exposes a settable level is better served by CoreAudio; one
         // that does not must go over DDC.
@@ -107,16 +122,21 @@ public final class DisplayController: @unchecked Sendable {
         var brightnessApply: ((Float) -> Void)!
         var volumeApply: ((Float) -> Void)!
         var muteApply: ((Bool) -> Void)!
+        var contrastApply: ((Float) -> Void)!
 
         brightnessWriter = CoalescingWriter(label: "nits.brightness.\(info.id)") {
             brightnessApply($0)
         }
         volumeWriter = CoalescingWriter(label: "nits.volume.\(info.id)") { volumeApply($0) }
         muteWriter = CoalescingWriter(label: "nits.mute.\(info.id)") { muteApply($0) }
+        contrastWriter = CoalescingWriter(label: "nits.contrast.\(info.id)") {
+            contrastApply($0)
+        }
 
         brightnessApply = { [weak self] in self?.applyBrightness($0) }
         volumeApply = { [weak self] in self?.applyVolume($0) }
         muteApply = { [weak self] in self?.applyMute($0) }
+        contrastApply = { [weak self] in self?.applyContrast($0) }
     }
 
     // MARK: - Observable state
@@ -125,12 +145,16 @@ public final class DisplayController: @unchecked Sendable {
     public var volume: Float { stateLock.withLock { _volume } }
     public var isMuted: Bool { stateLock.withLock { _isMuted } }
 
+    public var contrast: Float { stateLock.withLock { _contrast } }
+
     public var canSetBrightness: Bool { brightnessBackend != .unavailable }
     public var canSetVolume: Bool { volumeBackend != .unavailable }
+    public var canSetContrast: Bool { contrastBackend != .unavailable }
 
     /// True once brightness reflects the hardware, whether read or written.
     public var hasBrightnessReading: Bool { stateLock.withLock { _hasBrightnessReading } }
     public var hasVolumeReading: Bool { stateLock.withLock { _hasVolumeReading } }
+    public var hasContrastReading: Bool { stateLock.withLock { _hasContrastReading } }
 
     // MARK: - Reading (once, on connect)
 
@@ -184,6 +208,19 @@ public final class DisplayController: @unchecked Sendable {
             break
         }
 
+        // Unlike brightness, contrast is genuinely optional in MCCS: a panel that does
+        // not implement 0x12 answers with a non-zero result code, which the codec
+        // rejects. That refusal is the only reliable signal we get, so the UI keys the
+        // slider's existence off whether this read landed.
+        if contrastBackend == .ddc,
+           let reading = try? info.ddc?.get(.contrast, attempts: 3), reading.maximum > 0 {
+            setLocal {
+                self.contrastMax = reading.maximum
+                self._contrast = Float(reading.current) / Float(reading.maximum)
+                self._hasContrastReading = true
+            }
+        }
+
         notifyStateChanged()
     }
 
@@ -221,6 +258,17 @@ public final class DisplayController: @unchecked Sendable {
         muteWriter.submit(muted)
     }
 
+    public func setContrast(_ value: Float) {
+        guard canSetContrast else { return }
+        let clamped = max(0, min(1, value))
+        setLocal {
+            self._contrast = clamped
+            self._hasContrastReading = true
+        }
+        notifyStateChanged()
+        contrastWriter.submit(clamped)
+    }
+
     /// Nudges by a relative amount, for key presses. `step` is a fraction of full range.
     public func adjustBrightness(by step: Float) { setBrightness(brightness + step) }
     public func adjustVolume(by step: Float) { setVolume(volume + step) }
@@ -230,6 +278,7 @@ public final class DisplayController: @unchecked Sendable {
         brightnessWriter.flush()
         volumeWriter.flush()
         muteWriter.flush()
+        contrastWriter.flush()
     }
 
     // MARK: - Hardware application
@@ -267,6 +316,12 @@ public final class DisplayController: @unchecked Sendable {
         case .unavailable:
             break
         }
+    }
+
+    private func applyContrast(_ value: Float) {
+        guard contrastBackend == .ddc else { return }
+        let scaled = UInt16((value * Float(stateLock.withLock { contrastMax })).rounded())
+        try? info.ddc?.set(.contrast, value: scaled)
     }
 
     private func setLocal(_ body: () -> Void) {
