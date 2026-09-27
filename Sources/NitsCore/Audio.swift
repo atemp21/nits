@@ -41,6 +41,30 @@ public enum AudioControl {
         }
     }
 
+    /// Finds the output device belonging to a display.
+    ///
+    /// Monitor audio devices are named after the panel, so an exact name match is the
+    /// reliable signal. Falling back to "the only display-transport device" covers
+    /// panels whose audio device name differs from the EDID product name.
+    ///
+    /// `isBuiltIn` is not optional sugar: without it the fallback happily hands the
+    /// external monitor's audio device to the built-in display, which would then
+    /// control the wrong speakers.
+    public static func device(forDisplayNamed name: String, isBuiltIn: Bool) -> AudioDevice? {
+        let devices = outputDevices()
+
+        if isBuiltIn {
+            return devices.first { $0.transport == "built-in" }
+        }
+
+        if let exact = devices.first(where: { $0.name == name }) { return exact }
+
+        let displayTransport = devices.filter {
+            $0.transport == "DisplayPort" || $0.transport == "HDMI"
+        }
+        return displayTransport.count == 1 ? displayTransport[0] : nil
+    }
+
     public static func defaultOutputDeviceID() -> AudioDeviceID? {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDefaultOutputDevice,
