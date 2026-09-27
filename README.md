@@ -12,6 +12,9 @@ degraded on recent macOS. *nit* is the unit of luminance.
 brightness, volume and contrast, media-key interception with an on-screen HUD,
 per-display persistence, restore on reconnect and wake, and opt-in launch at login.
 
+Key step size is adjustable — fine (1/32), standard (1/16, matching macOS) or coarse
+(1/8) — with Shift+Option always a quarter of whichever is set.
+
 The media-key tap needs Accessibility permission, which cannot be granted
 programmatically; the app prompts on first launch and starts the tap the moment it is
 granted, with no relaunch. Everything else works without it.
@@ -76,6 +79,7 @@ cable, and whether the monitor's speakers expose a settable CoreAudio volume.
 - [x] **M4** event tap, custom HUD, key routing, fine steps *(needs Accessibility)*
 - [x] **M5** persistence, reconnect and wake handling, launch at login
 - [x] **M6** contrast slider (VCP `0x12`), shown only where the panel answers the read
+- [x] **M7** configurable key step size
 
 Deliberately out of scope for v1: sub-hardware-minimum software dimming,
 input-source switching (VCP `0x60`), named presets. Seams are left for each.

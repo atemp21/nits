@@ -15,11 +15,6 @@ final class MediaKeyTap {
         case volumeUp, volumeDown, mute
     }
 
-    /// Fractional step per press. macOS moves in sixteenths.
-    static let coarseStep: Float = 1.0 / 16.0
-    /// Shift+Option gives quarter steps, matching macOS's fine adjustment.
-    static let fineStep: Float = 1.0 / 64.0
-
     /// Called on the main actor for each intercepted press.
     var onKey: ((MediaKey, _ isFine: Bool, _ isRepeat: Bool) -> Void)?
 

@@ -26,6 +26,21 @@ struct ControlPanelView: View {
                     .toggleStyle(.checkbox)
                 Toggle("Launch at login", isOn: $model.launchAtLogin)
                     .toggleStyle(.checkbox)
+                HStack(spacing: 6) {
+                    Text("Key step")
+                    Picker("Key step", selection: $model.keyStep) {
+                        ForEach(KeyStep.allCases, id: \.self) { step in
+                            Text(step.label).tag(step)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .controlSize(.small)
+                }
+                .padding(.top, 2)
+                .help("How far one brightness or volume key press moves. "
+                      + "Shift+Option is always a quarter of this.")
+
                 if model.launchAtLoginNeedsApproval {
                     Text("Approve nits in System Settings › General › Login Items.")
                         .font(.system(size: 10))

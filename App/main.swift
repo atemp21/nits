@@ -88,7 +88,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func handle(key: MediaKeyTap.MediaKey, isFine: Bool) {
-        let step = isFine ? MediaKeyTap.fineStep : MediaKeyTap.coarseStep
+        let keyStep = model.keyStep
+        let step = isFine ? keyStep.fineFraction : keyStep.fraction
 
         switch key {
         case .brightnessUp, .brightnessDown:

@@ -116,6 +116,11 @@ final class AppModel: ObservableObject {
         didSet { manager.preferences.restoreOnConnect = restoreOnConnect }
     }
 
+    /// How far one media-key press moves a level.
+    @Published var keyStep: KeyStep {
+        didSet { manager.preferences.keyStep = keyStep }
+    }
+
     @Published var launchAtLogin: Bool {
         didSet {
             guard launchAtLogin != LaunchAtLogin.isEnabled else { return }
@@ -138,11 +143,13 @@ final class AppModel: ObservableObject {
 
     init() {
         self.restoreOnConnect = true
+        self.keyStep = .standard
         self.launchAtLogin = LaunchAtLogin.isEnabled
         manager.onControllersChanged = { [weak self] in
             Task { @MainActor in self?.rebuild() }
         }
         restoreOnConnect = manager.preferences.restoreOnConnect
+        keyStep = manager.preferences.keyStep
         launchAtLoginNeedsApproval = LaunchAtLogin.requiresApproval
         manager.start()
         rebuild()
