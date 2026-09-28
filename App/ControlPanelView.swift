@@ -130,6 +130,7 @@ private struct DisplaySectionView: View {
                             editing ? display.beginEditing() : display.endEditing()
                         })
                     .controlSize(.small)
+                    PercentLabel(value: display.volume)
                 }
             }
 
@@ -153,6 +154,20 @@ private struct SliderRow: View {
                 .frame(width: 16)
             Slider(value: $value, in: 0...1, onEditingChanged: onEditingChanged)
                 .controlSize(.small)
+            PercentLabel(value: value)
         }
+    }
+}
+
+/// Fixed width with monospaced digits, so the slider does not resize as the number
+/// changes length while dragging.
+private struct PercentLabel: View {
+    let value: Float
+
+    var body: some View {
+        Text("\(Int((value * 100).rounded()))%")
+            .font(.system(size: 11).monospacedDigit())
+            .foregroundStyle(.secondary)
+            .frame(width: 34, alignment: .trailing)
     }
 }
