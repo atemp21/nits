@@ -36,8 +36,9 @@ targets:
         # access. This permanently rules out Mac App Store distribution.
         ENABLE_APP_SANDBOX: NO
         ENABLE_HARDENED_RUNTIME: NO
-        # Ad-hoc signing is fine for personal use. A notarized build would need a
-        # Developer ID identity and hardened runtime enabled.
+        # Xcode signs ad-hoc; `make app` then re-signs with the stable local identity
+        # from `make signing-cert`, so the Accessibility grant survives rebuilds. A
+        # notarized build would need a Developer ID identity and hardened runtime.
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGNING_REQUIRED: NO
         CODE_SIGNING_ALLOWED: YES
