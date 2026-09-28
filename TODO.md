@@ -30,7 +30,6 @@ Left out of v1 deliberately, with seams already in place.
 Releases ship as a DMG signed with a self-signed certificate (`make release-cert`),
 built by `.github/workflows/release.yml` on a `v*` tag. Still to do:
 
-- [ ] **Create the release certificate and add the CI secrets**, then tag `v0.1.0`.
 - [ ] **App icon.** Menu-bar only today, so it has never needed one, but the DMG and
       Finder show the generic app icon.
 - [ ] **Developer ID signing and notarisation**, if a paid Apple developer account is

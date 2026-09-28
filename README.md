@@ -156,6 +156,7 @@ cable, and whether the monitor's speakers expose a settable CoreAudio volume.
 - [x] **M5** persistence, reconnect and wake handling, launch at login
 - [x] **M6** contrast slider (VCP `0x12`), shown only where the panel answers the read
 - [x] **M7** configurable key step size
+- [x] **v0.1.0** signed DMG releases, built by CI on a tag
 
 Deliberately out of scope for v1: sub-hardware-minimum software dimming,
 input-source switching (VCP `0x60`), named presets. Seams are left for each.

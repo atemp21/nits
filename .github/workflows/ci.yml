@@ -11,7 +11,7 @@ jobs:
     # they run on a hosted runner; the app itself is built locally with `make app`.
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: swift --version
       - run: make build
       - run: make test
