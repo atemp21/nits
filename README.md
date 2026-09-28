@@ -84,5 +84,4 @@ cable, and whether the monitor's speakers expose a settable CoreAudio volume.
 Deliberately out of scope for v1: sub-hardware-minimum software dimming,
 input-source switching (VCP `0x60`), named presets. Seams are left for each.
 
-Open items, including the one permission grant that v1 still needs, are in
-[TODO.md](TODO.md).
+Open items are in [TODO.md](TODO.md).

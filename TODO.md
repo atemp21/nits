@@ -5,21 +5,8 @@ only what is still outstanding.
 
 ## Blocked on a permission grant
 
-Neither of these can be scripted — both live in the SIP-protected TCC database, and
-`tccutil` can only reset permissions, never grant them.
-
-- [ ] **Grant nits Accessibility permission**, then verify the media keys end to end.
-      System Settings › Privacy & Security › Accessibility. The app prompts on launch
-      and polls afterwards, so the tap starts without a relaunch.
-
-      This is the last unverified piece of v1. The routing and HUD logic are tested,
-      but no real keypress has ever been through them. Worth checking specifically:
-      - F1/F2 change the Samsung's brightness when its window has focus
-      - volume keys hit the Samsung, not the laptop speakers, while it is the
-        default output
-      - Shift+Option gives quarter steps
-      - macOS does not also act on the key (no double HUD)
-      - the HUD appears on the display being adjusted
+This can't be scripted. It lives in the SIP-protected TCC database, and `tccutil`
+can only reset permissions, never grant them.
 
 - [ ] **Grant Warp Screen Recording** if real screenshots are ever wanted.
       Only needed for capturing the live UI; `make shots` renders offscreen without it.
