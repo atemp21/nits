@@ -124,10 +124,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let screen = NSScreen.screens.first { $0.displayID == display.controller.info.id }
         if isBrightness {
             hud.show(
+                title: "Brightness", deviceName: display.name,
                 systemImage: "sun.max.fill", level: display.brightness,
                 isMuted: false, on: screen)
         } else {
             hud.show(
+                title: "Volume", deviceName: display.name,
                 systemImage: display.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
                 level: display.volume, isMuted: display.isMuted, on: screen)
         }

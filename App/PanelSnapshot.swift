@@ -28,11 +28,15 @@ enum PanelSnapshot {
 
     /// Renders HUD variants side by side, for design review.
     static func renderHUDs(to path: String, scale: CGFloat = 2) -> Bool {
-        let samples = HStack(spacing: 16) {
-            HUDView(systemImage: "sun.max.fill", level: 0.75, isMuted: false)
-            HUDView(systemImage: "speaker.wave.2.fill", level: 0.34375, isMuted: false)
-            HUDView(systemImage: "speaker.slash.fill", level: 0.35, isMuted: true)
-            HUDView(systemImage: "sun.max.fill", level: 0.0, isMuted: false)
+        let samples = VStack(spacing: 12) {
+            HUDView(title: "Brightness", deviceName: "S24F350",
+                    systemImage: "sun.max.fill", level: 0.75, isMuted: false)
+            HUDView(title: "Volume", deviceName: "S24F350",
+                    systemImage: "speaker.wave.2.fill", level: 0.34375, isMuted: false)
+            HUDView(title: "Volume", deviceName: "S24F350",
+                    systemImage: "speaker.slash.fill", level: 0.35, isMuted: true)
+            HUDView(title: "Brightness", deviceName: "Built-in Display",
+                    systemImage: "sun.max.fill", level: 0.0, isMuted: false)
         }
         .padding(24)
         .background(Color(nsColor: .underPageBackgroundColor))

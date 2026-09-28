@@ -5,23 +5,25 @@ import AppKit
 ///
 /// macOS draws its own HUD, but it cannot show the level of a DDC display — and for a
 /// monitor whose volume the system cannot read at all, it shows nothing useful. So we
-/// draw our own on the display being adjusted.
+/// draw our own on the display being adjusted, styled after the system's own: a wide
+/// card in the top-right corner with a title, the device, and a continuous bar.
 ///
 /// Built from plain shapes rather than AppKit controls, which keeps it renderable
 /// offscreen for design review.
 struct HUDView: View {
+    static let size = CGSize(width: 300, height: 70)
+
+    let title: String
+    let deviceName: String
     let systemImage: String
     /// 0...1.
     let level: Float
     let isMuted: Bool
-    private let segmentCount = 16
 
-    /// How much of segment `index` is lit, 0...1. Fractional rather than rounded so
-    /// every key press visibly moves the bar: a fine step is half a segment and a
-    /// Shift+Option step an eighth, and whole segments would hide most of them.
-    private func fill(ofSegment index: Int) -> CGFloat {
-        guard !isMuted else { return 0 }
-        return CGFloat(max(0, min(1, level * Float(segmentCount) - Float(index))))
+    /// Continuous rather than stepped, so every key press visibly moves the bar, down
+    /// to a Shift+Option quarter step.
+    private var fill: CGFloat {
+        isMuted ? 0 : CGFloat(max(0, min(1, level)))
     }
 
     private var glassAvailable: Bool {
@@ -29,34 +31,38 @@ struct HUDView: View {
         return false
     }
 
-    /// Clear glass shows whatever is behind it, so the content cannot rely on the
-    /// light/dark appearance to contrast with it. White over a slight dim reads on any
-    /// wallpaper, which is what macOS does for content on clear glass.
-    private var ink: Color { glassAvailable ? .white : .primary }
-
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 34, style: .continuous)
-        VStack(spacing: 18) {
-            Image(systemName: systemImage)
-                .font(.system(size: 52, weight: .regular))
-                .foregroundStyle(ink)
-                .frame(height: 56)
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer(minLength: 8)
+                Text(deviceName)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
 
-            HStack(spacing: 3) {
-                ForEach(0..<segmentCount, id: \.self) { index in
+            HStack(spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 14))
+                    .frame(width: 20)
+                    .foregroundStyle(isMuted ? .secondary : .primary)
+
+                GeometryReader { proxy in
                     ZStack(alignment: .leading) {
-                        Rectangle().fill(ink.opacity(0.25))
-                        Rectangle().fill(ink).frame(width: 8 * fill(ofSegment: index))
+                        Capsule().fill(.primary.opacity(0.15))
+                        Capsule().fill(.primary)
+                            .frame(width: proxy.size.width * fill)
                     }
-                    .frame(width: 8, height: 8)
-                    .clipShape(RoundedRectangle(cornerRadius: 1, style: .continuous))
                 }
+                .frame(height: 6)
             }
         }
-        .shadow(color: .black.opacity(glassAvailable ? 0.25 : 0), radius: 3, y: 1)
-        .padding(.vertical, 26)
-        .padding(.horizontal, 24)
-        .frame(width: 200, height: 200)
+        .padding(.horizontal, 16)
+        .frame(width: Self.size.width, height: Self.size.height)
         .background { HUDBackground(shape: shape, glass: glassAvailable) }
     }
 }
@@ -70,7 +76,7 @@ private struct HUDBackground<S: Shape>: View {
 
     var body: some View {
         if #available(macOS 26, *), glass {
-            Color.clear.glassEffect(.clear.tint(.black.opacity(0.18)), in: shape)
+            Color.clear.glassEffect(.regular, in: shape)
         } else {
             shape.fill(Material.thick)
         }
@@ -85,10 +91,15 @@ final class HUDController {
 
     private let visibleDuration: TimeInterval = 1.0
 
-    func show(systemImage: String, level: Float, isMuted: Bool, on screen: NSScreen?) {
-        let view = HUDView(systemImage: systemImage, level: level, isMuted: isMuted)
+    func show(
+        title: String, deviceName: String, systemImage: String,
+        level: Float, isMuted: Bool, on screen: NSScreen?
+    ) {
+        let view = HUDView(
+            title: title, deviceName: deviceName, systemImage: systemImage,
+            level: level, isMuted: isMuted)
         let hosting = NSHostingView(rootView: view)
-        hosting.frame = NSRect(x: 0, y: 0, width: 200, height: 200)
+        hosting.frame = NSRect(origin: .zero, size: HUDView.size)
 
         let panel = existingPanel()
         panel.contentView = hosting
@@ -102,7 +113,7 @@ final class HUDController {
     private func existingPanel() -> NSPanel {
         if let panel { return panel }
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 200, height: 200),
+            contentRect: NSRect(origin: .zero, size: HUDView.size),
             // Non-activating is essential: showing the HUD must never steal focus
             // from whatever the user is working in.
             styleMask: [.borderless, .nonactivatingPanel],
@@ -124,12 +135,13 @@ final class HUDController {
     }
 
     private func position(_ panel: NSPanel, on screen: NSScreen?) {
-        // The full frame, not the visible one, so the menu bar and Dock do not pull
-        // the HUD off the screen's true centre.
-        guard let frame = screen?.frame else { return }
+        // The visible frame, so the HUD sits just under the menu bar where the
+        // system's own does, rather than behind it.
+        guard let frame = screen?.visibleFrame else { return }
+        let inset: CGFloat = 12
         let origin = NSPoint(
-            x: frame.midX - panel.frame.width / 2,
-            y: frame.midY - panel.frame.height / 2)
+            x: frame.maxX - panel.frame.width - inset,
+            y: frame.maxY - panel.frame.height - inset)
         panel.setFrameOrigin(origin)
     }
 
