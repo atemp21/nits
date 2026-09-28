@@ -47,9 +47,13 @@ struct ControlPanelView: View {
                         .foregroundStyle(.secondary)
                 }
                 if !model.hasAccessibilityPermission {
-                    Text("Grant Accessibility to control brightness with the keyboard.")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                    // Without the grant macOS keeps the keys, and nits only mirrors them.
+                    Button("Grant Accessibility so nits handles the keyboard keys…") {
+                        NSWorkspace.shared.open(URL(string:
+                            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                    }
+                    .buttonStyle(.link)
+                    .font(.system(size: 10))
                 }
             }
             .font(.system(size: 11))
@@ -126,7 +130,6 @@ private struct DisplaySectionView: View {
                             editing ? display.beginEditing() : display.endEditing()
                         })
                     .controlSize(.small)
-                    .disabled(display.isMuted)
                 }
             }
 

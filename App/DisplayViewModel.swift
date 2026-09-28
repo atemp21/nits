@@ -134,6 +134,11 @@ final class AppModel: ObservableObject {
 
     private let manager = DisplayManager()
 
+    /// Pulls in levels changed outside nits. Cheap: it never touches DDC.
+    func syncExternalChanges() {
+        for display in displays { display.controller.syncExternalChanges() }
+    }
+
     /// Flushes preferences on quit, where the debounced save would lose the last edit.
     func saveNow() { manager.preferences.saveNow() }
 

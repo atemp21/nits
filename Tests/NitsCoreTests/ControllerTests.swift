@@ -255,6 +255,52 @@ struct DisplayControllerTests {
         #expect(api.writes.last?.value == 2)
     }
 
+    @Test("a brightness change made outside nits is adopted on sync")
+    func syncAdoptsExternalBrightness() {
+        let api = FakePrivateAPI()
+        let controller = DisplayController(
+            info: makeDisplay(api: api, builtIn: true, ddc: false),
+            audioDevice: nil, api: api)
+        controller.refresh()
+
+        // macOS handling the brightness keys itself.
+        _ = api.setNativeBrightness(1, 0.8)
+        controller.syncExternalChanges()
+
+        #expect(controller.brightness == 0.8)
+    }
+
+    @Test("a sync straight after our own write does not revert it")
+    func syncRespectsPendingWrite() {
+        let api = FakePrivateAPI()
+        let controller = DisplayController(
+            info: makeDisplay(api: api, builtIn: true, ddc: false),
+            audioDevice: nil, api: api)
+        controller.refresh()
+
+        // The coalesced write has not reached the hardware yet, so it still reads 0.5.
+        controller.setBrightness(0.9)
+        controller.syncExternalChanges()
+
+        #expect(controller.brightness == 0.9)
+    }
+
+    @Test("raising the volume while muted unmutes the hardware, not just local state")
+    func volumeChangeUnmutesHardware() {
+        let api = FakePrivateAPI()
+        let controller = DisplayController(
+            info: makeDisplay(api: api, builtIn: false),
+            audioDevice: audioDevice(settable: false), api: api)
+
+        controller.setMuted(true)
+        controller.flush()
+        controller.setVolume(0.3)
+        controller.flush()
+
+        #expect(!controller.isMuted)
+        #expect(api.writes.last { $0.code == 0x8D }?.value == 2)
+    }
+
     @Test("contrast scales onto the panel's own range")
     func contrastScaling() {
         let api = FakePrivateAPI()

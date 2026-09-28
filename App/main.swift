@@ -7,12 +7,14 @@ import AppKit
 // on continuously-dragged sliders, which is most of what this app is.
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
     private let model = AppModel()
     private let keyTap = MediaKeyTap()
     private let hud = HUDController()
+    /// Runs only while the panel is open, so its sliders track changes made elsewhere.
+    private var syncTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -27,8 +29,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover = NSPopover()
         popover.behavior = .transient  // dismisses on click-away, like a menu
         popover.animates = false
-        popover.contentViewController = NSHostingController(
-            rootView: ControlPanelView(model: model))
+        popover.delegate = self
+        // Without .preferredContentSize the popover is positioned for its default
+        // 320x320, then shrinks to the SwiftUI height with its bottom edge pinned,
+        // leaving a gap between the arrow and the menu bar.
+        let hosting = NSHostingController(rootView: ControlPanelView(model: model))
+        hosting.sizingOptions = .preferredContentSize
+        popover.contentViewController = hosting
 
         startKeyTap()
 
@@ -88,6 +95,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func handle(key: MediaKeyTap.MediaKey, isFine: Bool) {
+        // Step from the real level, not a stale one, in case it changed elsewhere.
+        model.syncExternalChanges()
         let keyStep = model.keyStep
         let step = isFine ? keyStep.fineFraction : keyStep.fraction
 
@@ -134,10 +143,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             popover.performClose(nil)
         } else {
             model.refreshPermissionState()
+            model.syncExternalChanges()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             // Without this the popover cannot take key events reliably.
             popover.contentViewController?.view.window?.makeKey()
         }
+    }
+}
+
+extension AppDelegate {
+    func popoverDidShow(_ notification: Notification) {
+        syncTimer?.invalidate()
+        syncTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.model.syncExternalChanges() }
+        }
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        syncTimer?.invalidate()
+        syncTimer = nil
     }
 }
 

@@ -84,6 +84,12 @@ public final class DisplayController: @unchecked Sendable {
     private var volumeMax: UInt16 = 100
     private var contrastMax: UInt16 = 100
 
+    /// When this controller last changed a level itself. External syncs are skipped
+    /// just after, so a read cannot land before our coalesced write and snap the level
+    /// back to its old value.
+    private var lastLocalWrite = Date.distantPast
+    private static let syncQuietPeriod: TimeInterval = 1.0
+
     private let brightnessWriter: CoalescingWriter<Float>
     private let volumeWriter: CoalescingWriter<Float>
     private let muteWriter: CoalescingWriter<Bool>
@@ -224,6 +230,45 @@ public final class DisplayController: @unchecked Sendable {
         notifyStateChanged()
     }
 
+    // MARK: - Syncing with changes made elsewhere
+
+    /// Adopts levels that something other than nits changed — macOS handling the
+    /// brightness keys, Control Center, another app. Only the cheap local backends are
+    /// read (DisplayServices and CoreAudio); DDC is never polled, so external DDC
+    /// levels are still trusted to be whatever we last wrote.
+    public func syncExternalChanges() {
+        guard stateLock.withLock({
+            Date().timeIntervalSince(lastLocalWrite) > Self.syncQuietPeriod
+        }) else { return }
+
+        var changed = false
+        if brightnessBackend == .native, let value = api.nativeBrightness(info.id) {
+            setLocal {
+                if abs(self._brightness - value) > 0.005 || !self._hasBrightnessReading {
+                    self._brightness = value
+                    self._hasBrightnessReading = true
+                    changed = true
+                }
+            }
+        }
+        if case .coreAudio(let device) = volumeBackend {
+            let volume = AudioControl.volume(device)
+            let muted = AudioControl.isMuted(device)
+            setLocal {
+                if let volume, abs(self._volume - volume) > 0.005 || !self._hasVolumeReading {
+                    self._volume = volume
+                    self._hasVolumeReading = true
+                    changed = true
+                }
+                if let muted, muted != self._isMuted {
+                    self._isMuted = muted
+                    changed = true
+                }
+            }
+        }
+        if changed { notifyStateChanged() }
+    }
+
     // MARK: - Writing (optimistic, coalesced)
 
     /// Sets brightness in 0...1. Returns immediately; the hardware write is coalesced.
@@ -233,6 +278,7 @@ public final class DisplayController: @unchecked Sendable {
         setLocal {
             self._brightness = clamped
             self._hasBrightnessReading = true
+            self.lastLocalWrite = Date()
         }
         notifyStateChanged()
         brightnessWriter.submit(clamped)
@@ -241,19 +287,30 @@ public final class DisplayController: @unchecked Sendable {
     public func setVolume(_ value: Float) {
         guard canSetVolume else { return }
         let clamped = max(0, min(1, value))
+        var unmutes = false
         setLocal {
             self._volume = clamped
             self._hasVolumeReading = true
+            self.lastLocalWrite = Date()
             // Any deliberate volume change implies unmuting, matching macOS.
-            if clamped > 0 { self._isMuted = false }
+            if clamped > 0 && self._isMuted {
+                self._isMuted = false
+                unmutes = true
+            }
         }
         notifyStateChanged()
         volumeWriter.submit(clamped)
+        // The hardware must be told too: a muted device ignores its volume level, so
+        // clearing only the local flag leaves the slider moving with no audible effect.
+        if unmutes { muteWriter.submit(false) }
     }
 
     public func setMuted(_ muted: Bool) {
         guard canSetVolume else { return }
-        setLocal { self._isMuted = muted }
+        setLocal {
+            self._isMuted = muted
+            self.lastLocalWrite = Date()
+        }
         notifyStateChanged()
         muteWriter.submit(muted)
     }
