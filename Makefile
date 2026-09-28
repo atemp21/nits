@@ -1,4 +1,5 @@
-.PHONY: help build test probe probe-write clean gen app run run-panel stop shots signing-cert
+.PHONY: help build test probe probe-write clean gen app run run-panel stop shots signing-cert \
+	release release-cert dmg
 
 help:
 	@echo "nits — targets:"
@@ -10,6 +11,8 @@ help:
 	@echo "  make signing-cert create the local signing identity (once per machine)"
 	@echo "  make run          build and launch the menu-bar app"
 	@echo "  make stop         quit a running instance"
+	@echo "  make dmg          build a Release nits.app and package it as build/nits-VERSION.dmg"
+	@echo "  make release-cert create the release signing identity (once, ever)"
 	@echo "  make clean        remove build artifacts"
 
 build:
@@ -50,17 +53,9 @@ app: gen
 		echo "warning: no '$(SIGN_IDENTITY)' identity; ad-hoc signed, so Accessibility resets each build (run: make signing-cert)"; \
 	fi
 
-# One-off: a self-signed code-signing identity in the login keychain. It need not be
-# trusted; codesign only needs the key, and TCC matches on the certificate hash.
+# One-off: a self-signed code-signing identity in the login keychain.
 signing-cert:
-	@if security find-identity -p codesigning | grep -q "$(SIGN_IDENTITY)"; then \
-		echo "'$(SIGN_IDENTITY)' already exists"; exit 0; fi; \
-	dir=$$(mktemp -d) && pass=$$(openssl rand -hex 12) && \
-	printf '[req]\ndistinguished_name=dn\nprompt=no\nx509_extensions=ext\n[dn]\nCN=$(SIGN_IDENTITY)\n[ext]\nbasicConstraints=critical,CA:false\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=critical,codeSigning\n' > $$dir/cnf && \
-	openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -keyout $$dir/key.pem -out $$dir/cert.pem -config $$dir/cnf 2>/dev/null && \
-	openssl pkcs12 -export -legacy -inkey $$dir/key.pem -in $$dir/cert.pem -name "$(SIGN_IDENTITY)" -out $$dir/id.p12 -passout pass:$$pass && \
-	security import $$dir/id.p12 -k ~/Library/Keychains/login.keychain-db -P $$pass -T /usr/bin/codesign; \
-	rm -rf $$dir
+	@scripts/signing-cert.sh "$(SIGN_IDENTITY)"
 
 APP_PATH = $(shell xcodebuild -project nits.xcodeproj -scheme nits -configuration Debug \
 	-showBuildSettings 2>/dev/null | awk '/ BUILT_PRODUCTS_DIR/{print $$3}')/nits.app
@@ -82,6 +77,57 @@ shots: app
 	@mkdir -p $(SHOT_DIR)
 	@"$(APP_PATH)/Contents/MacOS/nits" --render-panel $(SHOT_DIR)/panel.png
 	@"$(APP_PATH)/Contents/MacOS/nits" --render-hud $(SHOT_DIR)/hud.png
+
+# --- Releases ---------------------------------------------------------------------
+#
+# No paid Apple Developer account, so no Developer ID and no notarisation: Gatekeeper
+# warns on first open whatever we do. Signing every release with one long-lived
+# self-signed certificate still matters, because the Accessibility grant is keyed on
+# it. Ad-hoc releases would silently lose the grant on every update.
+
+RELEASE_IDENTITY ?= nits Release Signing
+RELEASE_DIR = build/release
+RELEASE_APP = $(RELEASE_DIR)/DerivedData/Build/Products/Release/nits.app
+# From the latest tag, so CI building v0.2.0 ships 0.2.0.
+VERSION ?= $(shell git describe --tags --abbrev=0 --match 'v*' 2>/dev/null | sed 's/^v//' || true)
+BUILD_NUMBER ?= $(shell git rev-list --count HEAD)
+# CI sets this so a missing certificate fails the release instead of shipping ad-hoc.
+REQUIRE_SIGNED ?=
+
+release-cert:
+	@scripts/signing-cert.sh "$(RELEASE_IDENTITY)" build/release-cert/nits-release.p12
+
+release: gen
+	@test -n "$(VERSION)" || { echo "no version: tag a release (git tag v0.1.0) or pass VERSION=x.y.z"; exit 1; }
+	@rm -rf $(RELEASE_DIR) && mkdir -p $(RELEASE_DIR)
+	@xcodebuild -project nits.xcodeproj -scheme nits -configuration Release \
+		-derivedDataPath $(RELEASE_DIR)/DerivedData \
+		PRODUCT_BUNDLE_IDENTIFIER=$(BUNDLE_ID) \
+		MARKETING_VERSION=$(VERSION) CURRENT_PROJECT_VERSION=$(BUILD_NUMBER) \
+		build > $(RELEASE_DIR)/build.log 2>&1 \
+		|| { grep -E 'error:' $(RELEASE_DIR)/build.log || tail -30 $(RELEASE_DIR)/build.log; exit 1; }
+	@if security find-identity -p codesigning | grep -q "\"$(RELEASE_IDENTITY)\""; then \
+		codesign -f -s "$(RELEASE_IDENTITY)" "$(RELEASE_APP)" && echo "signed with $(RELEASE_IDENTITY)"; \
+	elif [ -n "$(REQUIRE_SIGNED)" ]; then \
+		echo "error: no '$(RELEASE_IDENTITY)' identity"; exit 1; \
+	else \
+		echo "warning: no '$(RELEASE_IDENTITY)' identity; ad-hoc signed, not fit to publish (run: make release-cert)"; \
+	fi
+	@codesign --verify --strict "$(RELEASE_APP)"
+	@echo "built $(RELEASE_APP) ($(VERSION), build $(BUILD_NUMBER))"
+
+# Plain hdiutil rather than create-dmg: one less dependency, and the Applications
+# symlink is all the drag-to-install layout needs.
+DMG = build/nits-$(VERSION).dmg
+dmg: release
+	@rm -rf $(RELEASE_DIR)/dmg $(DMG)
+	@mkdir -p $(RELEASE_DIR)/dmg
+	@ditto "$(RELEASE_APP)" $(RELEASE_DIR)/dmg/nits.app
+	@ln -s /Applications $(RELEASE_DIR)/dmg/Applications
+	@hdiutil create -volname "nits $(VERSION)" -srcfolder $(RELEASE_DIR)/dmg \
+		-fs HFS+ -format UDZO -ov -quiet $(DMG)
+	@cd build && shasum -a 256 nits-$(VERSION).dmg > nits-$(VERSION).dmg.sha256
+	@echo "packaged $(DMG)"
 
 clean:
 	swift package clean

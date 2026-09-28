@@ -27,13 +27,18 @@ Left out of v1 deliberately, with seams already in place.
 
 ## Binary releases
 
-Source builds work today. Shipping a downloadable app needs:
+Releases ship as a DMG signed with a self-signed certificate (`make release-cert`),
+built by `.github/workflows/release.yml` on a `v*` tag. Still to do:
 
-- [ ] **Developer ID signing and notarisation**, so Gatekeeper accepts it.
-      Requires enabling hardened runtime in `project.yml`, which is currently off, and
-      swapping ad-hoc signing for a real identity.
-- [ ] **App icon.** Menu-bar only today, so it has never needed one.
-- [ ] A release workflow that builds, signs and attaches the app to a GitHub release.
+- [ ] **Create the release certificate and add the CI secrets**, then tag `v0.1.0`.
+- [ ] **App icon.** Menu-bar only today, so it has never needed one, but the DMG and
+      Finder show the generic app icon.
+- [ ] **Developer ID signing and notarisation**, if a paid Apple developer account is
+      ever worth it. It removes the Gatekeeper "Open Anyway" step. Needs hardened
+      runtime enabled in `project.yml`, and changing certificate makes every user
+      re-grant Accessibility once.
+- [ ] **Update checks.** There are none; users find new versions on GitHub. Sparkle
+      works without notarisation, if it is ever wanted.
 
 Note: the Mac App Store is permanently out of reach. DDC needs private IOKit calls
 and IORegistry access, so the app cannot be sandboxed.

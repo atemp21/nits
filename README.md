@@ -35,15 +35,33 @@ you, and reports of what works on your hardware are very welcome (see
 [Contributing](#contributing)). `docs/hardware.md` has the measured timings and
 findings.
 
-There are no prebuilt binaries yet; build from source as below.
+## Installing
 
-## Requirements
+Needs an Apple Silicon Mac on macOS 14 or later.
+
+1. Download `nits-X.Y.Z.dmg` from [Releases](https://github.com/atemp21/nits/releases),
+   open it and drag **nits** to Applications.
+2. Open nits. macOS will refuse the first time, because nits is not notarised (that
+   needs a paid Apple developer account). Go to **System Settings → Privacy &
+   Security**, scroll down to the message about nits and click **Open Anyway**.
+   Alternatively, from Terminal: `xattr -dr com.apple.quarantine /Applications/nits.app`.
+3. nits appears in the menu bar and asks for **Accessibility** permission, which the
+   brightness and volume keys need. The sliders work without it.
+
+To update, quit nits and drag the new version over the old one. Every release is
+signed with the same certificate, so the Accessibility grant carries over. If you
+would rather not run an unnotarised binary, build from source as below; it is the same
+code.
+
+## Building from source
+
+### Requirements
 
 - Apple Silicon Mac, macOS 14 or later
 - Xcode 26 or later (the app uses the macOS 26 SDK, but still runs on macOS 14)
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) for the app: `brew install xcodegen`
 
-## Building and running
+### Building and running
 
 ```sh
 make signing-cert   # once per machine, see below
@@ -111,6 +129,19 @@ make shots   # render the panel and HUD to PNGs for design review
 
 The `.xcodeproj` is generated from `project.yml` rather than checked in, so build
 settings stay diffable.
+
+### Releasing
+
+```sh
+make release-cert        # once, ever; then add the two secrets it prints
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+The tag triggers `.github/workflows/release.yml`, which builds a Release app, signs it
+with the release certificate and publishes `nits-0.2.0.dmg` as a GitHub release.
+`make dmg` does the same locally. Keep the `.p12` and its password backed up: users'
+Accessibility grants are tied to that certificate, so replacing it makes everyone
+re-grant once.
 
 Run `make probe` with the monitor attached to find out whether DDC works on your
 cable, and whether the monitor's speakers expose a settable CoreAudio volume.

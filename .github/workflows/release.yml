@@ -1,0 +1,56 @@
+name: Release
+
+# Push a tag like v0.2.0 to build, sign and publish nits-0.2.0.dmg as a GitHub
+# release. Signed with the self-signed release certificate from `make release-cert`,
+# not Developer ID, so it is not notarised; see README "Installing".
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # The app needs the macOS 26 SDK, so Xcode 26 or later.
+    runs-on: macos-26
+    env:
+      VERSION: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # BUILD_NUMBER counts commits
+
+      - run: xcodebuild -version
+      - run: brew install xcodegen
+      - run: make build && make test
+
+      - name: Import release signing identity
+        env:
+          RELEASE_CERT_P12: ${{ secrets.RELEASE_CERT_P12 }}
+          RELEASE_CERT_PASSWORD: ${{ secrets.RELEASE_CERT_PASSWORD }}
+        run: |
+          test -n "$RELEASE_CERT_P12" || { echo "RELEASE_CERT_P12 secret missing (make release-cert)"; exit 1; }
+          kc="$RUNNER_TEMP/release.keychain-db"
+          kcpass=$(openssl rand -hex 16)
+          echo "$RELEASE_CERT_P12" | base64 --decode > "$RUNNER_TEMP/release.p12"
+          security create-keychain -p "$kcpass" "$kc"
+          security set-keychain-settings -lut 3600 "$kc"
+          security unlock-keychain -p "$kcpass" "$kc"
+          security import "$RUNNER_TEMP/release.p12" -k "$kc" -P "$RELEASE_CERT_PASSWORD" -T /usr/bin/codesign
+          # Lets codesign use the key without a GUI prompt.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$kcpass" "$kc" >/dev/null
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/release.p12"
+
+      - name: Build DMG
+        run: make dmg VERSION="${VERSION#v}" REQUIRE_SIGNED=1
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${VERSION#v}"
+          gh release create "$VERSION" "build/nits-$v.dmg" "build/nits-$v.dmg.sha256" \
+            --title "nits $v" --generate-notes \
+            --notes "$(printf 'Download **nits-%s.dmg**, open it and drag nits to Applications. It is not notarised, so the first launch needs one extra step: see [Installing](https://github.com/%s#installing).\n' "$v" "$GITHUB_REPOSITORY")"
