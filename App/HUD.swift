@@ -14,35 +14,59 @@ struct HUDView: View {
     /// 0...1.
     let level: Float
     let isMuted: Bool
-
     private let segmentCount = 16
 
     private var filledSegments: Int {
         isMuted ? 0 : Int((level * Float(segmentCount)).rounded())
     }
 
+    private var glassAvailable: Bool {
+        if #available(macOS 26, *) { return true }
+        return false
+    }
+
+    /// Clear glass shows whatever is behind it, so the content cannot rely on the
+    /// light/dark appearance to contrast with it. White over a slight dim reads on any
+    /// wallpaper, which is what macOS does for content on clear glass.
+    private var ink: Color { glassAvailable ? .white : .primary }
+
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 34, style: .continuous)
         VStack(spacing: 18) {
             Image(systemName: systemImage)
                 .font(.system(size: 52, weight: .regular))
-                .foregroundStyle(.primary)
+                .foregroundStyle(ink)
                 .frame(height: 56)
 
             HStack(spacing: 3) {
                 ForEach(0..<segmentCount, id: \.self) { index in
                     RoundedRectangle(cornerRadius: 1, style: .continuous)
-                        .fill(index < filledSegments ? Color.primary : Color.primary.opacity(0.22))
+                        .fill(index < filledSegments ? ink : ink.opacity(0.25))
                         .frame(width: 8, height: 8)
                 }
             }
         }
+        .shadow(color: .black.opacity(glassAvailable ? 0.25 : 0), radius: 3, y: 1)
         .padding(.vertical, 26)
         .padding(.horizontal, 24)
         .frame(width: 200, height: 200)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Material.thick))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background { HUDBackground(shape: shape, glass: glassAvailable) }
+    }
+}
+
+/// Kept as a separate layer behind the content rather than applied to it: content
+/// placed *inside* a glass effect is re-tinted by the system for vibrancy, which made
+/// the icon and the filled level segments vanish.
+private struct HUDBackground<S: Shape>: View {
+    let shape: S
+    let glass: Bool
+
+    var body: some View {
+        if #available(macOS 26, *), glass {
+            Color.clear.glassEffect(.clear.tint(.black.opacity(0.18)), in: shape)
+        } else {
+            shape.fill(Material.thick)
+        }
     }
 }
 
@@ -80,7 +104,12 @@ final class HUDController {
         panel.level = .screenSaver
         panel.backgroundColor = .clear
         panel.isOpaque = false
-        panel.hasShadow = true
+        // Glass draws its own edge and shadow; a window shadow on top doubles it.
+        if #available(macOS 26, *) {
+            panel.hasShadow = false
+        } else {
+            panel.hasShadow = true
+        }
         panel.ignoresMouseEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         self.panel = panel
@@ -88,11 +117,12 @@ final class HUDController {
     }
 
     private func position(_ panel: NSPanel, on screen: NSScreen?) {
-        guard let frame = screen?.visibleFrame else { return }
-        // Roughly where macOS puts its own HUD: horizontally centred, low.
+        // The full frame, not the visible one, so the menu bar and Dock do not pull
+        // the HUD off the screen's true centre.
+        guard let frame = screen?.frame else { return }
         let origin = NSPoint(
             x: frame.midX - panel.frame.width / 2,
-            y: frame.minY + frame.height * 0.12)
+            y: frame.midY - panel.frame.height / 2)
         panel.setFrameOrigin(origin)
     }
 
