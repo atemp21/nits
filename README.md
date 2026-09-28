@@ -6,6 +6,10 @@ and volume, and for making the Mac's own brightness/volume controls more precise
 Built because BetterDisplay Pro does far more than needed and MonitorControl has
 degraded on recent macOS. *nit* is the unit of luminance.
 
+<p align="center">
+  <img src="docs/images/panel.png" width="316" alt="The nits menu-bar panel, with brightness and volume sliders for the built-in display and an external monitor">
+</p>
+
 ## Features
 
 - Menu-bar panel with live sliders for brightness, volume and contrast, per display.
