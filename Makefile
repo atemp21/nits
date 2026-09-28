@@ -35,8 +35,13 @@ gen:
 # identity when one exists. `make signing-cert` creates it.
 SIGN_IDENTITY ?= nits Local Signing
 
+# TCC keys grants on the bundle id, so a fork building alongside an installed copy
+# should pick its own: `make run BUNDLE_ID=com.example.nits`.
+BUNDLE_ID ?= com.aarontempleton.nits
+
 app: gen
-	@xcodebuild -project nits.xcodeproj -scheme nits -configuration Debug build \
+	@xcodebuild -project nits.xcodeproj -scheme nits -configuration Debug \
+		PRODUCT_BUNDLE_IDENTIFIER=$(BUNDLE_ID) build \
 		| grep -E 'error:|BUILD' || true
 	@if security find-identity -p codesigning | grep -q "$(SIGN_IDENTITY)"; then \
 		codesign -f -s "$(SIGN_IDENTITY)" "$(APP_PATH)" 2>/dev/null \

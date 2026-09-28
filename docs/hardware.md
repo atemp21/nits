@@ -15,9 +15,9 @@ Samsung C34J79x (CJ79 34" ultrawide), with built-in speakers.
 | Property | Value |
 | --- | --- |
 | EDID product id | `0x0f1e` (3870) |
-| EDID serial | 809056048 |
+| EDID serial | *(redacted)* |
 | Product name | `C34J79x` |
-| Identity key | `19501-3870-809056048-External` |
+| Identity key | `19501-3870-<serial>-External` |
 | DCP path | `dcpext0@89C00000` → `dispext0:dcpav-service-epic:0/DCPAVServiceProxy` |
 
 ## Private API availability
@@ -100,7 +100,7 @@ the SIP-protected TCC database, and `tccutil` can only reset, never grant.
 | Screen Recording | `screencapture` of the real UI | offscreen renders still work (`make shots`) |
 
 Accessibility is granted to **nits.app**; Screen Recording, for development
-screenshots, is granted to the terminal (Warp) rather than to nits.
+screenshots, is granted to the terminal rather than to nits.
 
 The app prompts for Accessibility on first launch and then polls, so the tap starts
 the moment it is granted without needing a relaunch.

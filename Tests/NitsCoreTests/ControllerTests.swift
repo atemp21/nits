@@ -111,7 +111,7 @@ private func makeDisplay(
     return DisplayInfo(
         id: builtIn ? 1 : 3,
         identity: DisplayIdentity(
-            vendor: 19501, model: 3870, serial: 809056048,
+            vendor: 19501, model: 3870, serial: 123456789,
             location: builtIn ? nil : "External"),
         name: builtIn ? "Built-in Display" : "C34J79x",
         isBuiltIn: builtIn,

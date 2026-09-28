@@ -17,7 +17,7 @@ struct PreferencesTests {
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
 
         let store = PreferencesStore(url: url)
-        store.update("19501-3870-809056048-External") { settings in
+        store.update("19501-3870-123456789-External") { settings in
             settings.brightness = 0.42
             settings.volume = 0.19
             settings.isMuted = true
@@ -26,7 +26,7 @@ struct PreferencesTests {
         store.saveNow()
 
         let reloaded = PreferencesStore(url: url)
-        let settings = reloaded.settings(for: "19501-3870-809056048-External")
+        let settings = reloaded.settings(for: "19501-3870-123456789-External")
         #expect(settings?.brightness == 0.42)
         #expect(settings?.volume == 0.19)
         #expect(settings?.isMuted == true)

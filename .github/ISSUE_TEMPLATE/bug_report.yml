@@ -1,0 +1,44 @@
+name: Bug or hardware report
+description: Something doesn't work, or a report of what does on your monitor.
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead. For a hardware report, just say what works.
+    validations:
+      required: true
+  - type: input
+    id: monitor
+    attributes:
+      label: Monitor model
+      placeholder: Samsung C34J79x
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Connection
+      options:
+        - USB-C / Thunderbolt, direct
+        - DisplayPort
+        - HDMI
+        - Through a dock or hub
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: mac
+    attributes:
+      label: Mac and macOS version
+      placeholder: MacBook Pro M1 Pro, macOS 26.6
+    validations:
+      required: true
+  - type: textarea
+    id: probe
+    attributes:
+      label: Output of `make probe`
+      description: Run it with the monitor attached. It only reads and changes nothing.
+      render: text
+    validations:
+      required: true

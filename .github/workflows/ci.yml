@@ -1,0 +1,17 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    # NitsCore and nitsprobe only. The tests need no monitor and no private API, so
+    # they run on a hosted runner; the app itself is built locally with `make app`.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift --version
+      - run: make build
+      - run: make test

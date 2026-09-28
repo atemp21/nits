@@ -3,19 +3,11 @@
 Open items for nits. Things that are done live in the README roadmap; this file is
 only what is still outstanding.
 
-## Blocked on a permission grant
-
-This can't be scripted. It lives in the SIP-protected TCC database, and `tccutil`
-can only reset permissions, never grant them.
-
-- [ ] **Grant Warp Screen Recording** if real screenshots are ever wanted.
-      Only needed for capturing the live UI; `make shots` renders offscreen without it.
-
 ## Hardware coverage
 
 - [ ] **Test DDC over HDMI** and fill in the cable matrix in `docs/hardware.md`.
-      USB-C works fully, so this is curiosity rather than need. HDMI is the least
-      reliable DDC path on Apple Silicon.
+      HDMI is the least reliable DDC path on Apple Silicon.
+- [ ] **Test other monitors.** Everything so far is verified on one Samsung C34J79x.
 - [ ] **Test with the monitor as the only display** (laptop lid closed). Routing falls
       back to the single candidate, but it has never been exercised.
 - [ ] **Test a real sleep/wake and replug cycle.** The code paths exist and are
@@ -33,16 +25,15 @@ Left out of v1 deliberately, with seams already in place.
       Useful for flipping the monitor between the Mac and another machine.
 - [ ] **Named presets** per display, optionally auto-applied on connect.
 
-## Release readiness
+## Binary releases
 
-The repo is structured for release but is not releasable yet.
+Source builds work today. Shipping a downloadable app needs:
 
-- [ ] **Choose a licence** and add `LICENSE`. Deliberately left as your call.
-- [ ] **Developer ID signing and notarisation** for distribution outside your own Mac.
+- [ ] **Developer ID signing and notarisation**, so Gatekeeper accepts it.
       Requires enabling hardened runtime in `project.yml`, which is currently off, and
       swapping ad-hoc signing for a real identity.
 - [ ] **App icon.** Menu-bar only today, so it has never needed one.
-- [ ] Decide whether to make the GitHub repo public (`gh repo edit --visibility public`).
+- [ ] A release workflow that builds, signs and attaches the app to a GitHub release.
 
 Note: the Mac App Store is permanently out of reach. DDC needs private IOKit calls
 and IORegistry access, so the app cannot be sandboxed.

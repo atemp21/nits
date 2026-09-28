@@ -6,24 +6,65 @@ and volume, and for making the Mac's own brightness/volume controls more precise
 Built because BetterDisplay Pro does far more than needed and MonitorControl has
 degraded on recent macOS. *nit* is the unit of luminance.
 
+## Features
+
+- Menu-bar panel with live sliders for brightness, volume and contrast, per display.
+- Brightness and volume keys intercepted, with an on-screen HUD. Brightness goes to the
+  display with the focused window; volume goes to whichever display is playing the
+  sound.
+- Adjustable key step: fine (1/32), standard (1/16, matching macOS) or coarse (1/8),
+  with Shift+Option always a quarter of whichever is set.
+- Settings remembered per display and restored on reconnect and wake.
+- Opt-in launch at login.
+
+Many monitors, including the one this was built on, expose **no settable CoreAudio
+volume**, so macOS's own volume keys control nothing when the monitor is the default
+output. nits sends volume over DDC VCP `0x62` in that case, which is the gap this app
+closes.
+
 ## Status
 
-**v1 feature-complete, pending one permission.** Menu-bar app with live sliders for
-brightness, volume and contrast, media-key interception with an on-screen HUD,
-per-display persistence, restore on reconnect and wake, and opt-in launch at login.
+**v0.1, feature-complete for v1, tested on one monitor.** Developed and verified
+against a Samsung C34J79x over USB-C on an M1 Pro running macOS 26. Other panels and
+cables should work if they speak DDC/CI, but are unverified — `make probe` will tell
+you, and reports of what works on your hardware are very welcome (see
+[Contributing](#contributing)). `docs/hardware.md` has the measured timings and
+findings.
 
-Key step size is adjustable — fine (1/32), standard (1/16, matching macOS) or coarse
-(1/8) — with Shift+Option always a quarter of whichever is set.
+There are no prebuilt binaries yet; build from source as below.
 
-The media-key tap needs Accessibility permission, which cannot be granted
-programmatically; the app prompts on first launch and starts the tap the moment it is
+## Requirements
+
+- Apple Silicon Mac, macOS 14 or later
+- Xcode 26 or later (the app uses the macOS 26 SDK, but still runs on macOS 14)
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen) for the app: `brew install xcodegen`
+
+## Building and running
+
+```sh
+make signing-cert   # once per machine, see below
+make run            # build and launch the menu-bar app
+```
+
+The media-key tap needs **Accessibility** permission, which macOS will not let an app
+grant itself. nits prompts on first launch and starts the tap the moment it is
 granted, with no relaunch. Everything else works without it.
 
-See `docs/hardware.md` for measured timings and findings.
+Accessibility grants are tied to the code signature, and an ad-hoc signature changes
+on every build, silently revoking the grant. `make signing-cert` creates a
+self-signed code-signing identity named *nits Local Signing* in your login keychain so
+the grant survives rebuilds. It is not trusted system-wide and signs nothing but this
+app; delete it from Keychain Access whenever you like.
 
-Notable: this monitor exposes **no settable CoreAudio volume**, so volume has to go
-over DDC VCP `0x62`. That also means macOS's own volume keys control nothing when the
-monitor is the default output — which is precisely the gap this app closes.
+If you build a fork alongside another copy of nits, give it its own bundle id so the
+two don't share permission grants: `make run BUNDLE_ID=com.example.nits`.
+
+## A word of caution
+
+nits writes to your monitor's settings over DDC/CI using private macOS APIs. That is
+how every tool of this kind works, and it has been gentle on the hardware it was
+tested on, but monitors vary and some firmware is fragile. It is provided as-is, with
+no warranty; see [LICENSE](LICENSE).
 
 ## Why native Swift
 
@@ -54,7 +95,7 @@ than binding at link time, so a symbol disappearing in a future macOS degrades o
 feature instead of preventing launch. That single choke point is the direct answer to
 why comparable tools break across OS upgrades.
 
-## Usage
+## Development
 
 ```sh
 make test    # unit tests, no hardware needed
@@ -64,8 +105,8 @@ make stop    # quit it
 make shots   # render the panel and HUD to PNGs for design review
 ```
 
-`make app` and `make run` need `brew install xcodegen`; the `.xcodeproj` is generated
-from `project.yml` rather than checked in, so build settings stay diffable.
+The `.xcodeproj` is generated from `project.yml` rather than checked in, so build
+settings stay diffable.
 
 Run `make probe` with the monitor attached to find out whether DDC works on your
 cable, and whether the monitor's speakers expose a settable CoreAudio volume.
@@ -85,3 +126,14 @@ Deliberately out of scope for v1: sub-hardware-minimum software dimming,
 input-source switching (VCP `0x60`), named presets. Seams are left for each.
 
 Open items are in [TODO.md](TODO.md).
+
+## Contributing
+
+Bug reports and hardware reports are the most useful thing right now. Please include
+the output of `make probe`, your monitor model, and how it is connected (USB-C,
+DisplayPort, HDMI, dock). For code changes, read [CONTRIBUTING.md](CONTRIBUTING.md)
+first; the hard rules in [AGENTS.md](AGENTS.md) apply to everyone.
+
+## Licence
+
+[MIT](LICENSE).
