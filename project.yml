@@ -46,3 +46,6 @@ targets:
         CODE_SIGNING_REQUIRED: NO
         CODE_SIGNING_ALLOWED: YES
         COMBINE_HIDPI_IMAGES: YES
+        # App/AppIcon.icon is an Icon Composer document: Liquid Glass on macOS 26, and
+        # Xcode renders flat fallbacks for 14 and 15 from the same file.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

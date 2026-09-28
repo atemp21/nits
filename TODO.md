@@ -30,8 +30,6 @@ Left out of v1 deliberately, with seams already in place.
 Releases ship as a DMG signed with a self-signed certificate (`make release-cert`),
 built by `.github/workflows/release.yml` on a `v*` tag. Still to do:
 
-- [ ] **App icon.** Menu-bar only today, so it has never needed one, but the DMG and
-      Finder show the generic app icon.
 - [ ] **Developer ID signing and notarisation**, if a paid Apple developer account is
       ever worth it. It removes the Gatekeeper "Open Anyway" step. Needs hardened
       runtime enabled in `project.yml`, and changing certificate makes every user
