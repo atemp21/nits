@@ -16,8 +16,12 @@ struct HUDView: View {
     let isMuted: Bool
     private let segmentCount = 16
 
-    private var filledSegments: Int {
-        isMuted ? 0 : Int((level * Float(segmentCount)).rounded())
+    /// How much of segment `index` is lit, 0...1. Fractional rather than rounded so
+    /// every key press visibly moves the bar: a fine step is half a segment and a
+    /// Shift+Option step an eighth, and whole segments would hide most of them.
+    private func fill(ofSegment index: Int) -> CGFloat {
+        guard !isMuted else { return 0 }
+        return CGFloat(max(0, min(1, level * Float(segmentCount) - Float(index))))
     }
 
     private var glassAvailable: Bool {
@@ -40,9 +44,12 @@ struct HUDView: View {
 
             HStack(spacing: 3) {
                 ForEach(0..<segmentCount, id: \.self) { index in
-                    RoundedRectangle(cornerRadius: 1, style: .continuous)
-                        .fill(index < filledSegments ? ink : ink.opacity(0.25))
-                        .frame(width: 8, height: 8)
+                    ZStack(alignment: .leading) {
+                        Rectangle().fill(ink.opacity(0.25))
+                        Rectangle().fill(ink).frame(width: 8 * fill(ofSegment: index))
+                    }
+                    .frame(width: 8, height: 8)
+                    .clipShape(RoundedRectangle(cornerRadius: 1, style: .continuous))
                 }
             }
         }

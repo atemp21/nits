@@ -30,7 +30,7 @@ enum PanelSnapshot {
     static func renderHUDs(to path: String, scale: CGFloat = 2) -> Bool {
         let samples = HStack(spacing: 16) {
             HUDView(systemImage: "sun.max.fill", level: 0.75, isMuted: false)
-            HUDView(systemImage: "speaker.wave.2.fill", level: 0.35, isMuted: false)
+            HUDView(systemImage: "speaker.wave.2.fill", level: 0.34375, isMuted: false)
             HUDView(systemImage: "speaker.slash.fill", level: 0.35, isMuted: true)
             HUDView(systemImage: "sun.max.fill", level: 0.0, isMuted: false)
         }
