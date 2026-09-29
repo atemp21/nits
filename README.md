@@ -42,7 +42,8 @@ Needs an Apple Silicon Mac on macOS 14 or later.
 1. Download `nits-X.Y.Z.dmg` from [Releases](https://github.com/atemp21/nits/releases),
    open it and drag **nits** to Applications.
 2. Open nits. macOS will refuse the first time, because nits is not notarised (that
-   needs a paid Apple developer account). Go to **System Settings → Privacy &
+   needs a paid Apple developer account). The warning only offers **Done** and
+   **Move to Trash**: click **Done**. Then go to **System Settings → Privacy &
    Security**, scroll down to the message about nits and click **Open Anyway**.
    Alternatively, from Terminal: `xattr -dr com.apple.quarantine /Applications/nits.app`.
 3. nits appears in the menu bar and asks for **Accessibility** permission, which the
@@ -50,8 +51,9 @@ Needs an Apple Silicon Mac on macOS 14 or later.
 
 To update, quit nits and drag the new version over the old one. Every release is
 signed with the same certificate, so the Accessibility grant carries over. If you
-would rather not run an unnotarised binary, build from source as below; it is the same
-code.
+would rather not run an unnotarised binary, [install from source](#installing-from-source)
+instead; it is the same code, and Gatekeeper does not prompt for apps built on your
+own Mac.
 
 ## Building from source
 
@@ -60,6 +62,22 @@ code.
 - Apple Silicon Mac, macOS 14 or later
 - Xcode 26 or later (the app uses the macOS 26 SDK, but still runs on macOS 14)
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) for the app: `brew install xcodegen`
+
+### Installing from source
+
+```sh
+git clone https://github.com/atemp21/nits.git
+cd nits
+make install
+```
+
+This builds a Release copy, copies it to `/Applications` and launches it. The first
+run also creates the *nits Local Signing* identity described below, and macOS may ask
+for your login keychain password. Run `make install` again after pulling to update,
+and `make uninstall` to remove nits.
+
+A source install and the DMG are signed with different certificates, so switching
+between them means granting Accessibility again.
 
 ### Building and running
 

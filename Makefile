@@ -1,5 +1,5 @@
 .PHONY: help build test probe probe-write clean gen app run run-panel stop shots signing-cert \
-	release release-cert dmg
+	release release-cert dmg install uninstall
 
 help:
 	@echo "nits — targets:"
@@ -11,6 +11,8 @@ help:
 	@echo "  make signing-cert create the local signing identity (once per machine)"
 	@echo "  make run          build and launch the menu-bar app"
 	@echo "  make stop         quit a running instance"
+	@echo "  make install      build a Release nits.app and copy it to /Applications"
+	@echo "  make uninstall    quit nits and remove it from /Applications"
 	@echo "  make dmg          build a Release nits.app and package it as build/nits-VERSION.dmg"
 	@echo "  make release-cert create the release signing identity (once, ever)"
 	@echo "  make clean        remove build artifacts"
@@ -128,6 +130,27 @@ dmg: release
 		-fs HFS+ -format UDZO -ov -quiet $(DMG)
 	@cd build && shasum -a 256 nits-$(VERSION).dmg > nits-$(VERSION).dmg.sha256
 	@echo "packaged $(DMG)"
+
+# --- Installing from source -------------------------------------------------------
+#
+# A Release build signed with the local identity. Built on this machine, so it never
+# gets the quarantine flag and Gatekeeper does not get involved. The version falls
+# back to 0.0.0 in a clone without tags.
+
+INSTALL_DIR ?= /Applications
+
+install: signing-cert
+	@$(MAKE) --no-print-directory release RELEASE_IDENTITY="$(SIGN_IDENTITY)" \
+		VERSION="$(or $(VERSION),0.0.0)" REQUIRE_SIGNED=1
+	@$(MAKE) --no-print-directory stop
+	@rm -rf "$(INSTALL_DIR)/nits.app"
+	@ditto "$(RELEASE_APP)" "$(INSTALL_DIR)/nits.app"
+	@echo "installed $(INSTALL_DIR)/nits.app"
+	@open "$(INSTALL_DIR)/nits.app"
+
+uninstall: stop
+	@rm -rf "$(INSTALL_DIR)/nits.app"
+	@echo "removed $(INSTALL_DIR)/nits.app"
 
 clean:
 	swift package clean
