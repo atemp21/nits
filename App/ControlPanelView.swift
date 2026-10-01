@@ -26,6 +26,8 @@ struct ControlPanelView: View {
                     .toggleStyle(.checkbox)
                 Toggle("Launch at login", isOn: $model.launchAtLogin)
                     .toggleStyle(.checkbox)
+                Toggle("Check for updates daily", isOn: $model.automaticUpdateChecks)
+                    .toggleStyle(.checkbox)
                 HStack(spacing: 6) {
                     Text("Key step")
                     Picker("Key step", selection: $model.keyStep) {
@@ -59,6 +61,47 @@ struct ControlPanelView: View {
             .font(.system(size: 11))
             .padding(.top, 10)
 
+            UpdateSectionView(updater: model.updater)
+        }
+        .padding(14)
+        .frame(width: 290)
+    }
+}
+
+/// The panel's footer: an available update when there is one, then Quit and the
+/// version with a manual check.
+private struct UpdateSectionView: View {
+    @ObservedObject var updater: Updater
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let release = updater.available {
+                HStack(spacing: 6) {
+                    switch updater.activity {
+                    case .downloading:
+                        Text("Downloading nits \(release.version.description)…")
+                    case .installing:
+                        Text("Installing nits \(release.version.description)…")
+                    default:
+                        Text("nits \(release.version.description) is available")
+                        Spacer()
+                        Button("Install and Relaunch") { updater.install() }
+                            .controlSize(.small)
+                    }
+                }
+            }
+            if let status = updater.status {
+                Text(status)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if updater.installFailed {
+                Button("Open the release page…") { updater.openReleasePage() }
+                    .buttonStyle(.link)
+                    .font(.system(size: 10))
+            }
+
             HStack {
                 Button { NSApp.terminate(nil) } label: {
                     Label("Quit nits", systemImage: "power")
@@ -68,11 +111,18 @@ struct ControlPanelView: View {
                 .foregroundStyle(.secondary)
                 .help("Quit nits")
                 Spacer()
+                Button(updater.activity == .checking
+                       ? "Checking…" : "\(updater.currentVersionString) · Check for updates") {
+                    Task { await updater.check(userInitiated: true) }
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.tertiary)
+                .disabled(updater.activity != .idle)
             }
-            .padding(.top, 10)
+            .padding(.top, 4)
         }
-        .padding(14)
-        .frame(width: 290)
+        .font(.system(size: 11))
+        .padding(.top, 10)
     }
 }
 

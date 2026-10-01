@@ -34,8 +34,9 @@ built by `.github/workflows/release.yml` on a `v*` tag. Still to do:
       ever worth it. It removes the Gatekeeper "Open Anyway" step. Needs hardened
       runtime enabled in `project.yml`, and changing certificate makes every user
       re-grant Accessibility once.
-- [ ] **Update checks.** There are none; users find new versions on GitHub. Sparkle
-      works without notarisation, if it is ever wanted.
+- [ ] **Test an update on a second Mac**, from a DMG install in `/Applications` with
+      the Accessibility grant in place, and confirm the grant survives. The update
+      path has only been run on the development machine.
 
 Note: the Mac App Store is permanently out of reach. DDC needs private IOKit calls
 and IORegistry access, so the app cannot be sandboxed.

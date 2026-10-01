@@ -39,6 +39,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         startKeyTap()
 
+        // The render modes below draw one frame and exit; they have no business on
+        // the network.
+        let isRendering = CommandLine.arguments.contains("--render-hud")
+            || PanelSnapshot.requestedPath(from: CommandLine.arguments) != nil
+        if !isRendering {
+            model.updater.onShowPanel = { [weak self] in self?.showPanel() }
+            model.updater.start()
+        }
+
         // Dev affordance: lets the panel be opened without synthesising a click.
         if CommandLine.arguments.contains("--show-panel") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
@@ -140,16 +149,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     @objc private func togglePanel() {
-        guard let button = statusItem.button else { return }
         if popover.isShown {
             popover.performClose(nil)
         } else {
-            model.refreshPermissionState()
-            model.syncExternalChanges()
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            // Without this the popover cannot take key events reliably.
-            popover.contentViewController?.view.window?.makeKey()
+            showPanel()
         }
+    }
+
+    private func showPanel() {
+        guard let button = statusItem.button, !popover.isShown else { return }
+        model.refreshPermissionState()
+        model.syncExternalChanges()
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        // Without this the popover cannot take key events reliably.
+        popover.contentViewController?.view.window?.makeKey()
     }
 }
 

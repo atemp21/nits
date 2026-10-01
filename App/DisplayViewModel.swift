@@ -133,10 +133,15 @@ final class AppModel: ObservableObject {
         }
     }
 
+    @Published var automaticUpdateChecks: Bool {
+        didSet { manager.preferences.automaticUpdateChecks = automaticUpdateChecks }
+    }
+
     @Published var launchAtLoginNeedsApproval = false
     @Published var hasAccessibilityPermission = MediaKeyTap.hasAccessibilityPermission
 
     private let manager = DisplayManager()
+    let updater: Updater
 
     /// Pulls in levels changed outside nits. Cheap: it never touches DDC.
     func syncExternalChanges() {
@@ -154,6 +159,8 @@ final class AppModel: ObservableObject {
         self.restoreOnConnect = true
         self.keyStep = .standard
         self.launchAtLogin = LaunchAtLogin.isEnabled
+        self.automaticUpdateChecks = manager.preferences.automaticUpdateChecks
+        self.updater = Updater(preferences: manager.preferences)
         manager.onControllersChanged = { [weak self] in
             Task { @MainActor in self?.rebuild() }
         }
