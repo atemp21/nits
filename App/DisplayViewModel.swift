@@ -28,6 +28,10 @@ final class DisplayViewModel: ObservableObject, Identifiable {
     var canSetBrightness: Bool { controller.canSetBrightness }
     var canSetVolume: Bool { controller.canSetVolume }
 
+    /// Only the built-in panel goes dark at 0. A DDC backlight at 0 is merely at its
+    /// dimmest, so the panel must not label it 0%.
+    var brightnessReachesZero: Bool { controller.brightnessBackend == .native }
+
     /// Shown in the panel so it is obvious which transport a display is using.
     var backendSummary: String {
         let brightnessLabel: String
