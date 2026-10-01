@@ -60,9 +60,13 @@ struct ControlPanelView: View {
             .padding(.top, 10)
 
             HStack {
-                Button("Quit nits") { NSApp.terminate(nil) }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                Button { NSApp.terminate(nil) } label: {
+                    Label("Quit nits", systemImage: "power")
+                        .labelStyle(.iconOnly)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Quit nits")
                 Spacer()
             }
             .padding(.top, 10)
@@ -89,6 +93,7 @@ private struct DisplaySectionView: View {
             if display.canSetBrightness {
                 SliderRow(
                     systemImage: "sun.max.fill",
+                    reachesZero: display.brightnessReachesZero,
                     value: Binding(
                         get: { display.brightness },
                         set: { display.setBrightness($0) }),
@@ -130,7 +135,7 @@ private struct DisplaySectionView: View {
                             editing ? display.beginEditing() : display.endEditing()
                         })
                     .controlSize(.small)
-                    PercentLabel(value: display.volume)
+                    PercentLabel(value: display.volume, reachesZero: display.isMuted)
                 }
             }
 
@@ -145,6 +150,7 @@ private struct DisplaySectionView: View {
 
 private struct SliderRow: View {
     let systemImage: String
+    var reachesZero = true
     @Binding var value: Float
     let onEditingChanged: (Bool) -> Void
 
@@ -154,7 +160,7 @@ private struct SliderRow: View {
                 .frame(width: 16)
             Slider(value: $value, in: 0...1, onEditingChanged: onEditingChanged)
                 .controlSize(.small)
-            PercentLabel(value: value)
+            PercentLabel(value: value, reachesZero: reachesZero)
         }
     }
 }
@@ -163,9 +169,18 @@ private struct SliderRow: View {
 /// changes length while dragging.
 private struct PercentLabel: View {
     let value: Float
+    /// Whether the bottom of the range is genuinely off. Where it is not — an unmuted
+    /// speaker, a backlight at its dimmest — the label stops at 1%, so 0% always
+    /// means nothing is coming out.
+    let reachesZero: Bool
+
+    private var percent: Int {
+        let rounded = Int((value * 100).rounded())
+        return value > 0 || !reachesZero ? max(1, rounded) : rounded
+    }
 
     var body: some View {
-        Text("\(Int((value * 100).rounded()))%")
+        Text("\(percent)%")
             .font(.system(size: 11).monospacedDigit())
             .foregroundStyle(.secondary)
             .frame(width: 34, alignment: .trailing)
