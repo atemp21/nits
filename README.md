@@ -20,6 +20,7 @@ degraded on recent macOS. *nit* is the unit of luminance.
   with Shift+Option always a quarter of whichever is set.
 - Settings remembered per display and restored on reconnect and wake.
 - Opt-in launch at login.
+- Checks GitHub once a day for a new release, and installs it in place with one click.
 
 Many monitors, including the one this was built on, expose **no settable CoreAudio
 volume**, so macOS's own volume keys control nothing when the monitor is the default
@@ -49,8 +50,12 @@ Needs an Apple Silicon Mac on macOS 14 or later.
 3. nits appears in the menu bar and asks for **Accessibility** permission, which the
    brightness and volume keys need. The sliders work without it.
 
-To update, quit nits and drag the new version over the old one. Every release is
-signed with the same certificate, so the Accessibility grant carries over. If you
+nits checks GitHub for a new release once a day and posts a notification when there
+is one; **Install and Relaunch** in the panel downloads it and replaces the app in
+place. Nothing is installed without that click, and the check can be turned off in
+the panel. Every release is signed with the same certificate, so the Accessibility
+grant carries over. Updating by hand still works: quit nits and drag the new version
+over the old one. If you
 would rather not run an unnotarised binary, [install from source](#installing-from-source)
 instead; it is the same code, and Gatekeeper does not prompt for apps built on your
 own Mac.
@@ -74,7 +79,9 @@ make install
 This builds a Release copy, copies it to `/Applications` and launches it. The first
 run also creates the *nits Local Signing* identity described below, and macOS may ask
 for your login keychain password. Run `make install` again after pulling to update,
-and `make uninstall` to remove nits.
+and `make uninstall` to remove nits. A source install still announces new releases,
+but will not install them over itself: the download is signed with a different
+certificate.
 
 A source install and the DMG are signed with different certificates, so switching
 between them means granting Accessibility again.
@@ -159,7 +166,9 @@ The tag triggers `.github/workflows/release.yml`, which builds a Release app, si
 with the release certificate and publishes `nits-0.2.0.dmg` as a GitHub release.
 `make dmg` does the same locally. Keep the `.p12` and its password backed up: users'
 Accessibility grants are tied to that certificate, so replacing it makes everyone
-re-grant once.
+re-grant once. It would also stop installed copies updating themselves: the updater
+(`App/Updater.swift`) takes the `.dmg` asset of the latest non-prerelease release and
+installs it only if it is signed with the certificate the running copy was.
 
 Run `make probe` with the monitor attached to find out whether DDC works on your
 cable, and whether the monitor's speakers expose a settable CoreAudio volume.

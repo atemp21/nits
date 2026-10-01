@@ -86,6 +86,27 @@ struct PreferencesTests {
         #expect(store.settings(for: "key")?.brightness == 0.3)
         #expect(store.settings(for: "key")?.contrast == nil)
         #expect(store.keyStep == .standard, "a missing field falls back to its default")
+        #expect(store.automaticUpdateChecks)
+        #expect(store.lastUpdateCheck == nil)
+    }
+
+    @Test("update check state persists")
+    func updateStatePersists() {
+        let url = temporaryURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        let store = PreferencesStore(url: url)
+        #expect(store.automaticUpdateChecks, "checking should be the default")
+        let checked = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        store.automaticUpdateChecks = false
+        store.lastUpdateCheck = checked
+        store.notifiedUpdateVersion = "0.2.0"
+        store.saveNow()
+
+        let reloaded = PreferencesStore(url: url)
+        #expect(reloaded.automaticUpdateChecks == false)
+        #expect(reloaded.lastUpdateCheck == checked)
+        #expect(reloaded.notifiedUpdateVersion == "0.2.0")
     }
 
     @Test("the key step persists")

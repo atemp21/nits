@@ -65,6 +65,11 @@ public final class PreferencesStore: @unchecked Sendable {
         /// Whether to push stored levels back to a display when it reconnects.
         public var restoreOnConnect: Bool = true
         public var keyStep: KeyStep = .standard
+        public var automaticUpdateChecks: Bool = true
+        public var lastUpdateCheck: Date?
+        /// The version last announced with a notification, so a release is announced
+        /// once rather than on every daily check until it is installed.
+        public var notifiedUpdateVersion: String?
 
         public init() {}
 
@@ -79,6 +84,11 @@ public final class PreferencesStore: @unchecked Sendable {
             restoreOnConnect = try container.decodeIfPresent(
                 Bool.self, forKey: .restoreOnConnect) ?? true
             keyStep = try container.decodeIfPresent(KeyStep.self, forKey: .keyStep) ?? .standard
+            automaticUpdateChecks = try container.decodeIfPresent(
+                Bool.self, forKey: .automaticUpdateChecks) ?? true
+            lastUpdateCheck = try container.decodeIfPresent(Date.self, forKey: .lastUpdateCheck)
+            notifiedUpdateVersion = try container.decodeIfPresent(
+                String.self, forKey: .notifiedUpdateVersion)
         }
     }
 
@@ -112,6 +122,30 @@ public final class PreferencesStore: @unchecked Sendable {
         get { lock.withLock { root.keyStep } }
         set {
             lock.withLock { root.keyStep = newValue }
+            scheduleSave()
+        }
+    }
+
+    public var automaticUpdateChecks: Bool {
+        get { lock.withLock { root.automaticUpdateChecks } }
+        set {
+            lock.withLock { root.automaticUpdateChecks = newValue }
+            scheduleSave()
+        }
+    }
+
+    public var lastUpdateCheck: Date? {
+        get { lock.withLock { root.lastUpdateCheck } }
+        set {
+            lock.withLock { root.lastUpdateCheck = newValue }
+            scheduleSave()
+        }
+    }
+
+    public var notifiedUpdateVersion: String? {
+        get { lock.withLock { root.notifiedUpdateVersion } }
+        set {
+            lock.withLock { root.notifiedUpdateVersion = newValue }
             scheduleSave()
         }
     }
